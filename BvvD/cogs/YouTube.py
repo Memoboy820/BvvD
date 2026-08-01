@@ -5,6 +5,7 @@ from discord import app_commands
 from discord.ext import commands, tasks
 import requests
 import sqlite3
+from datetime import datetime
 
 load_dotenv()
 
@@ -217,24 +218,27 @@ class YouTubeCog(commands.Cog):
                 conn2.close()
 
                 embed = discord.Embed(
-                    title=channel_title,
-                    description=f'https://www.youtube.com/watch?v={current_video_id}',
+                    title=title,
+                    url=f'https://www.youtube.com/watch?v={current_video_id}',
                     color=0xFFFFFF
                 )
+                dt = datetime.fromisoformat(published_at.replace("Z", "+00:00"))
+                unix_time = int(dt.timestamp())
 
                 if live != 'none':
                     embed.add_field(name='📹 LIVE', value="\u200b", inline=False)
 
                 embed.set_thumbnail(url=avatar_url)
                 embed.add_field(
-                    name=title,
+                    name='Description:',
                     value=description[:120] if description else None,
                     inline=False
                 )
                 embed.set_image(url=thumb_url)
                 embed.set_footer(
-                    text=f'📍New video provided by BvvD bot | Published at {published_at[:10]} | {published_at[11:19]} ⏰'
+                    text=f'📍New video provided by BvvD bot | Published at <t:{unix_time}:f> ⏰'
                 )
+                embed.set_author(name=channel_title)
 
                 channel = self.bot.get_channel(channel_id)
                 if channel is not None:
