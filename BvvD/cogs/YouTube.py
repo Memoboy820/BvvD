@@ -76,7 +76,7 @@ class YouTubeCog(commands.Cog):
 
             embed.add_field(
                 name='Done!',
-                value=f'{interaction.channel.mention} is now **set** for **{self.data}** WarThunder YouTube'
+                value=f'{interaction.channel.mention} is now **set** for **{self.data}** WarThunder YouTube, and will ping members with {self.view.role} role'
             )
             await interaction.response.send_message(embed=embed, ephemeral=True)
 
@@ -85,6 +85,7 @@ class YouTubeCog(commands.Cog):
             super().__init__()
             langs = ['Russian', 'English']
             self.time = interaction.created_at
+            self.role = role
             self.role_id = role.id
 
             for lang in langs:
@@ -107,7 +108,8 @@ class YouTubeCog(commands.Cog):
 
         if channel_id in channel_ids:
             embed1 = discord.Embed(
-                title=f'**Removed** pings from <#{channel_id}>'
+                title=f'**Removed all** YouTube pings from <#{channel_id}>',
+                color=0xFFFFFF
             )
             cursor.execute("""
                 DELETE FROM youtube_settings
@@ -215,7 +217,7 @@ class YouTubeCog(commands.Cog):
 
                 embed = discord.Embed(
                     title=channel_title,
-                    description=description[:120] if description else None,
+                    description=f'https://www.youtube.com/watch?v={current_video_id}',
                     color=0xFFFFFF
                 )
 
@@ -225,12 +227,12 @@ class YouTubeCog(commands.Cog):
                 embed.set_thumbnail(url=avatar_url)
                 embed.add_field(
                     name=title,
-                    value=f'https://www.youtube.com/watch?v={current_video_id}',
+                    value=f'description[:120] if description else None',
                     inline=False
                 )
                 embed.set_image(url=thumb_url)
                 embed.set_footer(
-                    text=f'📍New video provided by BvvD bot | Published at {published_at} ⏰'
+                    text=f'📍New video provided by BvvD bot | Published at {published_at[:10]} | {published_at[11:19]} ⏰'
                 )
 
                 channel = self.bot.get_channel(channel_id)
