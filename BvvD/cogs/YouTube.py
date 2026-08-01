@@ -118,7 +118,7 @@ class YouTubeCog(commands.Cog):
             await interaction.response.send_message(embed=embed1, ephemeral=True)
         else:
             embed1 = discord.Embed(
-                title='This channel is **not** set for any pings'
+                title='This channel is **not** set for any pings',
                 color=0xFFFFFF
             )
             await interaction.response.send_message(embed=embed1, ephemeral=True)
