@@ -222,8 +222,6 @@ class YouTubeCog(commands.Cog):
                     url=f'https://www.youtube.com/watch?v={current_video_id}',
                     color=0xFFFFFF
                 )
-                dt = datetime.fromisoformat(published_at.replace("Z", "+00:00"))
-                unix_time = int(dt.timestamp())
 
                 if live != 'none':
                     embed.add_field(name='📹 LIVE', value="\u200b", inline=False)
@@ -236,7 +234,7 @@ class YouTubeCog(commands.Cog):
                 )
                 embed.set_image(url=thumb_url)
                 embed.set_footer(
-                    text=f'📍New video provided by BvvD bot | Published at <t:{unix_time}:f> ⏰'
+                    text=f'📍New video provided by BvvD bot'
                 )
                 embed.set_author(name=channel_title)
 
