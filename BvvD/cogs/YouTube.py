@@ -228,7 +228,7 @@ class YouTubeCog(commands.Cog):
                 embed.set_thumbnail(url=avatar_url)
                 embed.add_field(
                     name=title,
-                    value=f'description[:120] if description else None',
+                    value=description[:120] if description else None,
                     inline=False
                 )
                 embed.set_image(url=thumb_url)
