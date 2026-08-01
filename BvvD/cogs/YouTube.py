@@ -29,10 +29,12 @@ class YouTubeCog(commands.Cog):
 
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS youtube_settings (
-            guild_id INTEGER PRIMARY KEY,
+            guild_id INTEGER NOT NULL,
             channel_id INTEGER NOT NULL,
             language TEXT NOT NULL,
-            last_video_id TEXT
+            last_video_id TEXT,
+            role_id INTEGER,
+            PRIMARY KEY (guild_id, language)
         )
         """)
 
@@ -43,8 +45,9 @@ class YouTubeCog(commands.Cog):
         name='setyoutubepings',
         description="Bot will make pings on new WT videos in the channel you've written this command"
     )
-    async def setyoutubepings(self, interaction: discord.Interaction):
-        view = YouTubeCog.ytView(interaction)
+    async def setyoutubepings(self, interaction: discord.Interaction, role: discord.Role):
+
+        view = YouTubeCog.ytView(interaction, role)
         embed = discord.Embed(
             title='Choose one of the WT YouTube channels:',
             color=0xFFFFFF
@@ -62,29 +65,74 @@ class YouTubeCog(commands.Cog):
             conn = sqlite3.connect("bot.db")
             cursor = conn.cursor()
             cursor.execute("""
-                INSERT OR REPLACE INTO youtube_settings (guild_id, channel_id, language, last_video_id)
+                INSERT OR REPLACE INTO youtube_settings (guild_id, channel_id, language, last_video_id, role_id)
                 VALUES (?, ?, ?, COALESCE(
-                    (SELECT last_video_id FROM youtube_settings WHERE guild_id = ?),
+                    (SELECT last_video_id FROM youtube_settings WHERE guild_id = ? AND language = ?),
                     NULL
-                ))
-            """, (interaction.guild_id, interaction.channel.id, self.data, interaction.guild_id))
+                ), ?)
+            """, (interaction.guild_id, interaction.channel.id, self.data, interaction.guild_id, self.data, self.view.role_id))
             conn.commit()
             conn.close()
 
             embed.add_field(
                 name='Done!',
-                value=f'{interaction.channel.mention} is now set for **{self.data}** WarThunder YouTube'
+                value=f'{interaction.channel.mention} is now **set** for **{self.data}** WarThunder YouTube'
             )
             await interaction.response.send_message(embed=embed, ephemeral=True)
 
     class ytView(discord.ui.View):
-        def __init__(self, interaction: discord.Interaction):
+        def __init__(self, interaction: discord.Interaction, role: discord.Role):
             super().__init__()
             langs = ['Russian', 'English']
             self.time = interaction.created_at
+            self.role_id = role.id
 
             for lang in langs:
                 self.add_item(YouTubeCog.ytButton(lang))
+
+
+    @app_commands.command(name='removeyoutubepings', description='Bot will stop making pings on new WT videos in the channel command was written in')
+    async def removeyoutubepings(self, interaction: discord.Interaction):
+        guild_id = interaction.guild.id
+        channel_id = interaction.channel.id
+        conn = sqlite3.connect("bot.db")
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            SELECT channel_id FROM youtube_settings
+            WHERE guild_id = ?;
+            """,(guild_id,))
+        rows = cursor.fetchall()
+        channel_ids = [row[0] for row in rows]
+
+        if channel_id in channel_ids:
+            embed1 = discord.Embed(
+                title=f'**Removed** pings from <#{channel_id}>'
+            )
+            cursor.execute("""
+                DELETE FROM youtube_settings
+                WHERE guild_id = ? AND channel_id = ?
+                """,(guild_id, channel_id))
+            await interaction.response.send_message(embed=embed1, ephemeral=True)
+        else:
+            embed1 = discord.Embed(
+                title='This channel is **not** set for any pings'
+            )
+            await interaction.response.send_message(embed=embed1, ephemeral=True)
+
+
+
+
+        conn.commit()
+        conn.close()
+
+
+
+
+
+
+
+    
 
     @tasks.loop(minutes=5)
     async def check_youtube(self):
@@ -109,11 +157,11 @@ class YouTubeCog(commands.Cog):
         conn = sqlite3.connect("bot.db")
         cursor = conn.cursor()
 
-        cursor.execute("SELECT guild_id, channel_id, language, last_video_id FROM youtube_settings")
+        cursor.execute("SELECT guild_id, channel_id, language, last_video_id, role_id FROM youtube_settings")
         rows = cursor.fetchall()
         conn.close()
 
-        for guild_id, channel_id, language, last_video_id in rows:
+        for guild_id, channel_id, language, last_video_id, role_id in rows:
             if language == 'Russian':
                 url_main = url_rus
                 av_url = av_url_rus
@@ -159,8 +207,8 @@ class YouTubeCog(commands.Cog):
                 cursor2.execute("""
                 UPDATE youtube_settings
                 SET last_video_id = ?
-                WHERE guild_id = ?
-                """, (current_video_id, guild_id))
+                WHERE guild_id = ? AND language = ?
+                """, (current_video_id, guild_id, language))
 
                 conn2.commit()
                 conn2.close()
@@ -187,7 +235,7 @@ class YouTubeCog(commands.Cog):
 
                 channel = self.bot.get_channel(channel_id)
                 if channel is not None:
-                    await channel.send(embed=embed)
+                    await channel.send(content=f"<@&{role_id}>", embed=embed)
 
     @check_youtube.before_loop
     async def before_check_youtube(self):
