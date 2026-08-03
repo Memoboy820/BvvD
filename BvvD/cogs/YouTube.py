@@ -237,7 +237,7 @@ class YouTubeCog(commands.Cog):
                 )
                 embed.set_image(url=thumb_url)
                 embed.set_footer(
-                    text=f'📍New video provided by BvvD bot'
+                    text=f'📍New video provided by BvvD bot | Published at {published_at[11:19]} ⏰'
                 )
                 embed.set_author(name=channel_title)
 
