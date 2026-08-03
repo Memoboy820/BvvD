@@ -25,7 +25,8 @@ class YouTubeCog(commands.Cog):
         self.check_youtube.cancel()
 
     def init_db(self):
-        conn = sqlite3.connect("bot.db")
+        os.makedirs("/app/data", exist_ok=True)
+        conn = sqlite3.connect("/app/data/database.db")
         cursor = conn.cursor()
 
         cursor.execute("""
@@ -63,7 +64,7 @@ class YouTubeCog(commands.Cog):
         async def callback(self, interaction: discord.Interaction):
             embed = discord.Embed(color=0xFFFFFF)
 
-            conn = sqlite3.connect("bot.db")
+            conn = sqlite3.connect("/app/data/database.db")
             cursor = conn.cursor()
             cursor.execute("""
                 INSERT OR REPLACE INTO youtube_settings (guild_id, channel_id, language, last_video_id, role_id)
@@ -97,7 +98,7 @@ class YouTubeCog(commands.Cog):
     async def removeyoutubepings(self, interaction: discord.Interaction):
         guild_id = interaction.guild.id
         channel_id = interaction.channel.id
-        conn = sqlite3.connect("bot.db")
+        conn = sqlite3.connect("/app/data/database.db")
         cursor = conn.cursor()
 
         cursor.execute("""
@@ -158,7 +159,7 @@ class YouTubeCog(commands.Cog):
             f"?part=snippet&id={RUS_CHANNEL_ID}&key={YOUTUBE_API_KEY}"
         )
 
-        conn = sqlite3.connect("bot.db")
+        conn = sqlite3.connect("/app/data/database.db")
         cursor = conn.cursor()
 
         cursor.execute("SELECT guild_id, channel_id, language, last_video_id, role_id FROM youtube_settings")
@@ -205,7 +206,7 @@ class YouTubeCog(commands.Cog):
                 thumb_url = thumbs["default"]["url"]
 
             if current_video_id != last_video_id:
-                conn2 = sqlite3.connect("bot.db")
+                conn2 = sqlite3.connect("/app/data/database.db")
                 cursor2 = conn2.cursor()
 
                 cursor2.execute("""
@@ -222,6 +223,8 @@ class YouTubeCog(commands.Cog):
                     url=f'https://www.youtube.com/watch?v={current_video_id}',
                     color=0xFFFFFF
                 )
+                dt = datetime.fromisoformat(published_at.replace("Z", "+00:00"))
+                unix_time = int(dt.timestamp())
 
                 if live != 'none':
                     embed.add_field(name='📹 LIVE', value="\u200b", inline=False)
@@ -234,7 +237,7 @@ class YouTubeCog(commands.Cog):
                 )
                 embed.set_image(url=thumb_url)
                 embed.set_footer(
-                    text=f'📍New video provided by BvvD bot'
+                    text=f'📍New video provided by BvvD bot | Published at <t:{unix_time}:f> ⏰'
                 )
                 embed.set_author(name=channel_title)
 
