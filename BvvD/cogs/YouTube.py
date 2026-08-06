@@ -141,113 +141,118 @@ class YouTubeCog(commands.Cog):
 
     @tasks.loop(minutes=5)
     async def check_youtube(self):
-        url_eng = (
-            f"https://www.googleapis.com/youtube/v3/search"
-            f"?part=snippet&channelId={ENG_CHANNEL_ID}&order=date&type=video&maxResults=1&key={YOUTUBE_API_KEY}"
-        )
-        url_rus = (
-            f"https://www.googleapis.com/youtube/v3/search"
-            f"?part=snippet&channelId={RUS_CHANNEL_ID}&order=date&type=video&maxResults=1&key={YOUTUBE_API_KEY}"
-        )
+            url_eng = (
+                f"https://www.googleapis.com/youtube/v3/search"
+                f"?part=snippet&channelId={ENG_CHANNEL_ID}&order=date&type=video&maxResults=1&key={YOUTUBE_API_KEY}"
+            )
+            url_rus = (
+                f"https://www.googleapis.com/youtube/v3/search"
+                f"?part=snippet&channelId={RUS_CHANNEL_ID}&order=date&type=video&maxResults=1&key={YOUTUBE_API_KEY}"
+            )
 
-        av_url_eng = (
-            f"https://www.googleapis.com/youtube/v3/channels"
-            f"?part=snippet&id={ENG_CHANNEL_ID}&key={YOUTUBE_API_KEY}"
-        )
-        av_url_rus = (
-            f"https://www.googleapis.com/youtube/v3/channels"
-            f"?part=snippet&id={RUS_CHANNEL_ID}&key={YOUTUBE_API_KEY}"
-        )
+            av_url_eng = (
+                f"https://www.googleapis.com/youtube/v3/channels"
+                f"?part=snippet&id={ENG_CHANNEL_ID}&key={YOUTUBE_API_KEY}"
+            )
+            av_url_rus = (
+                f"https://www.googleapis.com/youtube/v3/channels"
+                f"?part=snippet&id={RUS_CHANNEL_ID}&key={YOUTUBE_API_KEY}"
+            )
 
-        conn = sqlite3.connect("/app/data/database.db")
-        cursor = conn.cursor()
+            conn = sqlite3.connect("/app/data/database.db")
+            cursor = conn.cursor()
 
-        cursor.execute("SELECT guild_id, channel_id, language, last_video_id, role_id FROM youtube_settings")
-        rows = cursor.fetchall()
-        conn.close()
+            cursor.execute("SELECT guild_id, channel_id, language, last_video_id, role_id FROM youtube_settings")
+            rows = cursor.fetchall()
+            conn.close()
 
-        for guild_id, channel_id, language, last_video_id, role_id in rows:
-            if language == 'Russian':
-                url_main = url_rus
-                av_url = av_url_rus
-            elif language == 'English':
-                url_main = url_eng
-                av_url = av_url_eng
-            else:
-                continue
+            for guild_id, channel_id, language, last_video_id, role_id in rows:
+                try:
+                    if language == 'Russian':
+                        url_main = url_rus
+                        av_url = av_url_rus
+                    elif language == 'English':
+                        url_main = url_eng
+                        av_url = av_url_eng
+                    else:
+                        continue
+                        
+                    response1 = requests.get(av_url, timeout=10)
+                    response1.raise_for_status()
+                    data1 = response1.json()
+                    avatar_thumbs = data1["items"][0]["snippet"]["thumbnails"]
+                    avatar_url = avatar_thumbs["high"]["url"]
 
-            response1 = requests.get(av_url, timeout=10)
-            data1 = response1.json()
-            avatar_thumbs = data1["items"][0]["snippet"]["thumbnails"]
-            avatar_url = avatar_thumbs["high"]["url"]
+                    response = requests.get(url_main, timeout=10)
+                    response.raise_for_status()
+                    data = response.json()
+                    print(data)
+                    item = data['items'][0]
 
-            response = requests.get(url_main, timeout=10)
-            data = response.json()
-            print(data)
-            item = data['items'][0]
+                    current_video_id = item["id"]["videoId"]
+                    channel_title = item["snippet"]["channelTitle"]
+                    title = item["snippet"]["title"]
+                    description = item["snippet"]["description"]
+                    live = item["snippet"]["liveBroadcastContent"]
+                    published_at = item["snippet"]["publishedAt"]
 
-            current_video_id = item["id"]["videoId"]
-            channel_title = item["snippet"]["channelTitle"]
-            title = item["snippet"]["title"]
-            description = item["snippet"]["description"]
-            live = item["snippet"]["liveBroadcastContent"]
-            published_at = item["snippet"]["publishedAt"]
+                    thumbs = item["snippet"]["thumbnails"]
+                    if "maxres" in thumbs:
+                        thumb_url = thumbs["maxres"]["url"]
+                    elif "standard" in thumbs:
+                        thumb_url = thumbs["standard"]["url"]
+                    elif "high" in thumbs:
+                        thumb_url = thumbs["high"]["url"]
+                    elif "medium" in thumbs:
+                        thumb_url = thumbs["medium"]["url"]
+                    else:
+                        thumb_url = thumbs["default"]["url"]
 
-            thumbs = item["snippet"]["thumbnails"]
-            if "maxres" in thumbs:
-                thumb_url = thumbs["maxres"]["url"]
-            elif "standard" in thumbs:
-                thumb_url = thumbs["standard"]["url"]
-            elif "high" in thumbs:
-                thumb_url = thumbs["high"]["url"]
-            elif "medium" in thumbs:
-                thumb_url = thumbs["medium"]["url"]
-            else:
-                thumb_url = thumbs["default"]["url"]
+                    if current_video_id != last_video_id:
+                        conn2 = sqlite3.connect("/app/data/database.db")
+                        cursor2 = conn2.cursor()
 
-            if current_video_id != last_video_id:
-                conn2 = sqlite3.connect("/app/data/database.db")
-                cursor2 = conn2.cursor()
+                        cursor2.execute("""
+                        UPDATE youtube_settings
+                        SET last_video_id = ?
+                        WHERE guild_id = ? AND language = ?
+                        """, (current_video_id, guild_id, language))
 
-                cursor2.execute("""
-                UPDATE youtube_settings
-                SET last_video_id = ?
-                WHERE guild_id = ? AND language = ?
-                """, (current_video_id, guild_id, language))
+                        conn2.commit()
+                        conn2.close()
 
-                conn2.commit()
-                conn2.close()
+                        embed = discord.Embed(
+                            title=title,
+                            url=f'https://www.youtube.com/watch?v={current_video_id}',
+                            color=0xFFFFFF
+                        )
 
-                embed = discord.Embed(
-                    title=title,
-                    url=f'https://www.youtube.com/watch?v={current_video_id}',
-                    color=0xFFFFFF
-                )
-                dt = datetime.fromisoformat(published_at.replace("Z", "+00:00"))
-                unix_time = int(dt.timestamp())
+                        if live != 'none':
+                            embed.add_field(name='📹 LIVE', value="\u200b", inline=False)
 
-                if live != 'none':
-                    embed.add_field(name='📹 LIVE', value="\u200b", inline=False)
+                        embed.set_thumbnail(url=avatar_url)
+                        embed.add_field(
+                            name='Description:',
+                            value=description[:120] if description else None,
+                            inline=False
+                        )
+                        embed.set_image(url=thumb_url)
+                        embed.set_footer(
+                            text=f'📍New video provided by BvvD bot | Published at {published_at[11:19]} ⏰'
+                        )
+                        embed.set_author(name=channel_title)
 
-                embed.set_thumbnail(url=avatar_url)
-                embed.add_field(
-                    name='Description:',
-                    value=description[:120] if description else None,
-                    inline=False
-                )
-                embed.set_image(url=thumb_url)
-                embed.set_footer(
-                    text=f'📍New video provided by BvvD bot | Published at {published_at[11:19]} ⏰'
-                )
-                embed.set_author(name=channel_title)
+                        channel = self.bot.get_channel(channel_id)
+                        if channel is not None:
+                            await channel.send(content=f"<@&{role_id}>", embed=embed)
 
-                channel = self.bot.get_channel(channel_id)
-                if channel is not None:
-                    await channel.send(content=f"<@&{role_id}>", embed=embed)
+                except Exception as e:
+                    print(f"[check_youtube] ошибка: {type(e).__name__}: {e}")
 
     @check_youtube.before_loop
     async def before_check_youtube(self):
         await self.bot.wait_until_ready()
+
 
 
 async def setup(bot):
