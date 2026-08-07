@@ -139,16 +139,20 @@ class YouTubeCog(commands.Cog):
 
     
 
-    @tasks.loop(minutes=10)
+    @tasks.loop(minutes=1)
     async def check_youtube(self):
+
+            RUS_UPL_ID = "UUbLGQK0n8cA6oa-W50GTHyQ"
+            ENG_UPL_ID = "UUPZsNertSS82YCT2qX9-wHA"
+
             url_eng = (
-                f"https://www.googleapis.com/youtube/v3/search"
-                f"?part=snippet&channelId={ENG_CHANNEL_ID}&order=date&type=video&maxResults=1&key={YOUTUBE_API_KEY}"
+                f"https://www.googleapis.com/youtube/v3/playlistItems"
+                f"?part=snippet&playlistId={ENG_UPL_ID}&maxResults=1&key={YOUTUBE_API_KEY}"
             )
             url_rus = (
-                f"https://www.googleapis.com/youtube/v3/search"
-                f"?part=snippet&channelId={RUS_CHANNEL_ID}&order=date&type=video&maxResults=1&key={YOUTUBE_API_KEY}"
-            )
+                f"https://www.googleapis.com/youtube/v3/playlistItems"
+                f"?part=snippet&playlistId={RUS_UPL_ID}&maxResults=1&key={YOUTUBE_API_KEY}"
+)
 
             av_url_eng = (
                 f"https://www.googleapis.com/youtube/v3/channels"
@@ -193,7 +197,7 @@ class YouTubeCog(commands.Cog):
                     channel_title = item["snippet"]["channelTitle"]
                     title = item["snippet"]["title"]
                     description = item["snippet"]["description"]
-                    live = item["snippet"]["liveBroadcastContent"]
+                    live = item["snippet"].get("liveBroadcastContent", "none")
                     published_at = item["snippet"]["publishedAt"]
 
                     print(f"[YT] guild={guild_id} language={language} last={last_video_id} current={current_video_id}")
