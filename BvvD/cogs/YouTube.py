@@ -193,7 +193,7 @@ class YouTubeCog(commands.Cog):
                     print(data)
                     item = data['items'][0]
 
-                    current_video_id = item["id"]["videoId"]
+                    current_video_id = item["snippet"]["resourceId"]["videoId"]
                     channel_title = item["snippet"]["channelTitle"]
                     title = item["snippet"]["title"]
                     description = item["snippet"]["description"]
