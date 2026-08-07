@@ -139,7 +139,7 @@ class YouTubeCog(commands.Cog):
 
     
 
-    @tasks.loop(minutes=5)
+    @tasks.loop(minutes=10)
     async def check_youtube(self):
             url_eng = (
                 f"https://www.googleapis.com/youtube/v3/search"
@@ -196,6 +196,8 @@ class YouTubeCog(commands.Cog):
                     live = item["snippet"]["liveBroadcastContent"]
                     published_at = item["snippet"]["publishedAt"]
 
+                    print(f"[YT] guild={guild_id} language={language} last={last_video_id} current={current_video_id}")
+
                     thumbs = item["snippet"]["thumbnails"]
                     if "maxres" in thumbs:
                         thumb_url = thumbs["maxres"]["url"]
@@ -247,7 +249,7 @@ class YouTubeCog(commands.Cog):
                             await channel.send(content=f"<@&{role_id}>", embed=embed)
 
                 except Exception as e:
-                    print(f"[check_youtube] ошибка: {type(e).__name__}: {e}")
+                    print(f"[check_youtube] guild={guild_id} language={language} error={type(e).__name__}: {e}")
 
     @check_youtube.before_loop
     async def before_check_youtube(self):
