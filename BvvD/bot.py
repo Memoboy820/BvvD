@@ -24,6 +24,7 @@ bot = commands.Bot(
 
 async def setup_hook():
     await bot.load_extension("cogs.YouTube")
+    await bot.load_extension("cogs.News")
 
     guild = discord.Object(id=GUILD_ID)
     bot.tree.copy_global_to(guild=guild)
