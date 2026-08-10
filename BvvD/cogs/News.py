@@ -166,8 +166,8 @@ class NewsCog(commands.Cog):
     @tasks.loop(minutes=1)
     async def check_news(self):
 
-        RUS_URL = "https://store.steampowered.com/events/ajaxgetadjacentpartnerevents/?appid=236390&lang_list=8"
-        ENG_URL = "https://store.steampowered.com/events/ajaxgetadjacentpartnerevents/?appid=236390&lang_list=0"
+        RUS_URL = "https://store.steampowered.com/events/ajaxgetadjacentpartnerevents/?appid=236390&lang_list=8&count_before=0&count_after=5"
+        ENG_URL = "https://store.steampowered.com/events/ajaxgetadjacentpartnerevents/?appid=236390&lang_list=0&count_before=0&count_after=5"
 
         conn = sqlite3.connect("/app/data/databaseNews.db")
         cursor = conn.cursor()
@@ -178,6 +178,7 @@ class NewsCog(commands.Cog):
         rows = cursor.fetchall()
         conn.commit()
         conn.close()
+        print("ROWS FROM DB:", rows)
 
         for guild_id, channel_id, role_id, last_news_id, language in rows:
             try:
@@ -192,16 +193,19 @@ class NewsCog(commands.Cog):
                 response.raise_for_status()
                 data = response.json()
 
-                event_name = data["events"][0]["event_name"]
-                description = data["events"][0]["announcement_body"]["body"]
-                clan_id = data["events"][0]["announcement_body"]["clanid"]
-                image_id = json.loads(data["events"][0]["jsondata"])["localized_capsule_image"][0]
-                current_news_id = data["events"][0]["gid"]
-                app_id = data["events"][0]["appid"]
+                selected_event = next(
+                    (event for event in data["events"][:5] if event["gid"] != last_news_id),
+                    None
+                )
 
+                if selected_event is not None:
+                    event_name = selected_event["event_name"]
+                    description = selected_event["announcement_body"]["body"]
+                    clan_id = selected_event["announcement_body"]["clanid"]
+                    image_id = json.loads(selected_event["jsondata"])["localized_capsule_image"][0]
+                    current_news_id = selected_event["gid"]
+                    app_id = selected_event["appid"]
 
-
-                if last_news_id != current_news_id:
                     conn = sqlite3.connect("/app/data/databaseNews.db")
                     cursor = conn.cursor()
 
