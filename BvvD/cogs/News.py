@@ -204,10 +204,14 @@ class NewsCog(commands.Cog):
                     sent_ids = json.loads(sent_news_ids)
                 else:
                     sent_ids = []
+                if not sent_ids and last_news_id:
+                    sent_ids = [last_news_id]
+
+                sent_ids = [str(x) for x in sent_ids]
 
                 selected_event = None
                 for event in data["events"][:5]:
-                    if event["gid"] not in sent_ids:
+                    if str(event["gid"]) not in sent_ids:
                         selected_event = event
                         break
 
