@@ -249,7 +249,9 @@ class YouTubeCog(commands.Cog):
                             await channel.send(content=f"<@&{role_id}>", embed=embed)
 
                 except Exception as e:
-                    print(f"[check_youtube] guild={guild_id} language={language} error={type(e).__name__}: {e}")
+                    import traceback
+                    print(f"[check_youtube] guild={guild_id} language={language}")
+                    traceback.print_exc()
 
     @check_youtube.before_loop
     async def before_check_youtube(self):
