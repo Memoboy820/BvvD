@@ -56,10 +56,15 @@ class NewsCog(commands.Cog):
             channel_id INTEGER NOT NULL,
             role_id INTEGER NOT NULL,
             last_news_id TEXT,
+            sent_news_ids TEXT,
             language TEXT NOT NULL,
             PRIMARY KEY (guild_id, language)
             )
         """)
+        try:
+            cursor.execute("ALTER TABLE news_settings ADD COLUMN sent_news_ids TEXT")
+        except sqlite3.OperationalError:
+            pass
 
         conn.commit()
         conn.close()
@@ -90,9 +95,12 @@ class NewsCog(commands.Cog):
             cursor = conn.cursor()
 
             cursor.execute("""
-        INSERT OR REPLACE INTO news_settings (guild_id, channel_id, role_id, language)
-        VALUES (?, ?, ?, ?)
-    """, (guild_id, channel_id, role_id, language))
+                INSERT INTO news_settings (guild_id, channel_id, role_id, language, last_news_id, sent_news_ids)
+                VALUES (?, ?, ?, ?, NULL, NULL)
+                ON CONFLICT(guild_id, language) DO UPDATE SET
+                    channel_id = excluded.channel_id,
+                    role_id = excluded.role_id
+            """, (guild_id, channel_id, role_id, language))
 
             conn.commit()
             conn.close()
@@ -173,14 +181,14 @@ class NewsCog(commands.Cog):
         cursor = conn.cursor()
 
         cursor.execute("""
-            SELECT guild_id, channel_id, role_id, last_news_id, language from news_settings
+            SELECT guild_id, channel_id, role_id, last_news_id, sent_news_ids, language from news_settings
         """)
         rows = cursor.fetchall()
         conn.commit()
         conn.close()
         print("ROWS FROM DB:", rows)
 
-        for guild_id, channel_id, role_id, last_news_id, language in rows:
+        for guild_id, channel_id, role_id, last_news_id, sent_news_ids, language in rows:
             try:
                 if language == 'Russian':
                     MAIN_URL = RUS_URL
@@ -192,48 +200,58 @@ class NewsCog(commands.Cog):
                 response = requests.get(MAIN_URL, timeout=10)
                 response.raise_for_status()
                 data = response.json()
+                if sent_news_ids:
+                    sent_ids = json.loads(sent_news_ids)
+                else:
+                    sent_ids = []
 
-                selected_event = next(
-                    (event for event in data["events"][:5] if event["gid"] != last_news_id),
-                    None
+                selected_event = None
+                for event in data["events"][:5]:
+                    if event["gid"] not in sent_ids:
+                        selected_event = event
+                        break
+
+                if selected_event is None:
+                    continue
+
+                event_name = selected_event["event_name"]
+                description = selected_event["announcement_body"]["body"]
+                clan_id = selected_event["announcement_body"]["clanid"]
+                image_id = json.loads(selected_event["jsondata"])["localized_capsule_image"][0]
+                current_news_id = selected_event["gid"]
+                app_id = selected_event["appid"]
+
+                conn = sqlite3.connect("/app/data/databaseNews.db")
+                cursor = conn.cursor()
+
+                sent_ids.append(current_news_id)
+                sent_ids = list(dict.fromkeys(sent_ids))[-20:]
+
+                cursor.execute("""
+                    UPDATE news_settings
+                    SET last_news_id = ?, sent_news_ids = ?
+                    WHERE channel_id = ? AND language = ?
+
+                """, (current_news_id, json.dumps(sent_ids), channel_id, language))
+                conn.commit()
+                conn.close()
+
+                embed = discord.Embed(
+                    title=event_name,
+                    url=f"https://steamcommunity.com/games/{app_id}/announcements/detail/{current_news_id}",
+                    color=0xFFFFFF
                 )
+                embed.add_field(name="Description:", value=bbcode_to_discord(description)[:1000] + '...')
+                embed.set_image(url=f"https://clan.akamai.steamstatic.com/images/{clan_id}/{image_id}")
+                embed.set_footer(text='📍News provided by BvvD bot')
+                if language == 'Russian':
+                    embed.set_author(name='Новости War Thunder')
+                elif language == 'English':
+                    embed.set_author(name='War Thunder News')
 
-                if selected_event is not None:
-                    event_name = selected_event["event_name"]
-                    description = selected_event["announcement_body"]["body"]
-                    clan_id = selected_event["announcement_body"]["clanid"]
-                    image_id = json.loads(selected_event["jsondata"])["localized_capsule_image"][0]
-                    current_news_id = selected_event["gid"]
-                    app_id = selected_event["appid"]
-
-                    conn = sqlite3.connect("/app/data/databaseNews.db")
-                    cursor = conn.cursor()
-
-                    cursor.execute("""
-                        UPDATE news_settings
-                        SET last_news_id = ?
-                        WHERE channel_id = ? AND language = ?
-
-                    """, (current_news_id, channel_id, language))
-                    conn.commit()
-                    conn.close()
-
-                    embed = discord.Embed(
-                        title=event_name,
-                        url=f"https://steamcommunity.com/games/{app_id}/announcements/detail/{current_news_id}",
-                        color=0xFFFFFF
-                    )
-                    embed.add_field(name="Description:", value=bbcode_to_discord(description)[:1000] + '...')
-                    embed.set_image(url=f"https://clan.akamai.steamstatic.com/images/{clan_id}/{image_id}")
-                    embed.set_footer(text='📍News provided by BvvD bot')
-                    if language == 'Russian':
-                        embed.set_author(name='Новости War Thunder')
-                    elif language == 'English':
-                        embed.set_author(name='War Thunder News')
-
-                    channel = self.bot.get_channel(channel_id)
-                    if channel is not None:
-                        await channel.send(content=f"<@&{role_id}>", embed=embed)
+                channel = self.bot.get_channel(channel_id)
+                if channel is not None:
+                    await channel.send(content=f"<@&{role_id}>", embed=embed)
 
             except Exception as e:
                 print(f"[check_news] guild={guild_id} language={language} error={type(e).__name__}: {e}")
