@@ -5,14 +5,10 @@ from discord import app_commands
 from discord.ext import commands, tasks
 import requests
 import sqlite3
-from datetime import datetime
 
 load_dotenv()
 
 YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY")
-
-RUS_CHANNEL_ID = "UCbLGQK0n8cA6oa-W50GTHyQ"
-ENG_CHANNEL_ID = "UCPZsNertSS82YCT2qX9-wHA"
 
 
 class YouTubeCog(commands.Cog):
@@ -43,10 +39,7 @@ class YouTubeCog(commands.Cog):
         conn.commit()
         conn.close()
 
-    @app_commands.command(
-        name='setyoutubepings',
-        description="Bot will make pings on new WT videos in the channel you've written this command"
-    )
+    @app_commands.command(name='setyoutubepings', description="Bot will make pings on new WT videos in the channel you've written this command")
     async def setyoutubepings(self, interaction: discord.Interaction, role: discord.Role):
 
         view = YouTubeCog.ytView(interaction, role)
@@ -69,8 +62,9 @@ class YouTubeCog(commands.Cog):
             cursor.execute("""
                 INSERT OR REPLACE INTO youtube_settings (guild_id, channel_id, language, last_video_id, role_id)
                 VALUES (?, ?, ?, COALESCE(
-                    (SELECT last_video_id FROM youtube_settings WHERE guild_id = ? AND language = ?),
-                    NULL
+                    (SELECT last_video_id FROM youtube_settings 
+                    WHERE guild_id = ? AND language = ?
+                    ), NULL
                 ), ?)
             """, (interaction.guild_id, interaction.channel.id, self.data, interaction.guild_id, self.data, self.view.role_id))
             conn.commit()
@@ -120,7 +114,7 @@ class YouTubeCog(commands.Cog):
             await interaction.response.send_message(embed=embed1, ephemeral=True)
         else:
             embed1 = discord.Embed(
-                title='This channel is **not** set for any pings',
+                title='This channel is **not** set for any **YouTube** pings',
                 color=0xFFFFFF
             )
             await interaction.response.send_message(embed=embed1, ephemeral=True)
@@ -144,6 +138,9 @@ class YouTubeCog(commands.Cog):
 
             RUS_UPL_ID = "UUbLGQK0n8cA6oa-W50GTHyQ"
             ENG_UPL_ID = "UUPZsNertSS82YCT2qX9-wHA"
+
+            RUS_CHANNEL_ID = "UCbLGQK0n8cA6oa-W50GTHyQ"
+            ENG_CHANNEL_ID = "UCPZsNertSS82YCT2qX9-wHA"
 
             url_eng = (
                 f"https://www.googleapis.com/youtube/v3/playlistItems"
@@ -193,7 +190,7 @@ class YouTubeCog(commands.Cog):
                     print(data)
                     item = data['items'][0]
 
-                    current_video_id = item["snippet"]["resourceId"]["videoId"]
+                    current_video_id = item["id"]["videoId"]
                     channel_title = item["snippet"]["channelTitle"]
                     title = item["snippet"]["title"]
                     description = item["snippet"]["description"]
