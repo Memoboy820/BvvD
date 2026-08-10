@@ -178,7 +178,6 @@ class NewsCog(commands.Cog):
         rows = cursor.fetchall()
         conn.commit()
         conn.close()
-        print("ROWS FROM DB:", rows)
 
         for guild_id, channel_id, role_id, last_news_id, language in rows:
             try:
