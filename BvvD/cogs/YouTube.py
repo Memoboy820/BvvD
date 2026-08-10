@@ -187,7 +187,6 @@ class YouTubeCog(commands.Cog):
                     response = requests.get(url_main, timeout=10)
                     response.raise_for_status()
                     data = response.json()
-                    print(data)
                     item = data['items'][0]
 
                     current_video_id = item["id"]["videoId"]
