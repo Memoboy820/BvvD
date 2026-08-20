@@ -44,7 +44,8 @@ class YouTubeCog(commands.Cog):
 
         view = YouTubeCog.ytView(interaction, role)
         embed = discord.Embed(
-            title=':flag_us:Choose one of the WT YouTube languages for this channel: \n:flag_ru: Выберите язык Ютуб канала ВарТандера для этого канала:',
+            title='YouTube Pings / Пинги Ютуба',
+            description=':flag_us: Choose one of the WT YouTube languages for this channel: \n:flag_ru: Выберите язык Ютуб канала ВарТандера для этого канала:',
             color=0xFFFFFF
         )
         await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
