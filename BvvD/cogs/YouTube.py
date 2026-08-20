@@ -44,7 +44,7 @@ class YouTubeCog(commands.Cog):
 
         view = YouTubeCog.ytView(interaction, role)
         embed = discord.Embed(
-            title='Choose one of the WT YouTube languages for this channel: / Выберите язык Ютуб канала ВарТандера для этого канала:',
+            title=':flag_us:Choose one of the WT YouTube languages for this channel: \n:flag_ru: Выберите язык Ютуб канала ВарТандера для этого канала:',
             color=0xFFFFFF
         )
         await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
@@ -235,12 +235,12 @@ class YouTubeCog(commands.Cog):
                         embed.set_thumbnail(url=avatar_url)
                         embed.add_field(
                             name='Description:',
-                            value=description[:120] if description else None,
+                            value=description[:120] if description else "\u200b",
                             inline=False
                         )
                         embed.set_image(url=thumb_url)
                         embed.set_footer(
-                            text=f'📍New video provided by BvvD bot | Published at {published_at[11:19]} ⏰'
+                            text=f'📍New video provided by BvvD bot'
                         )
                         embed.set_author(name=channel_title)
 
