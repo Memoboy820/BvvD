@@ -74,7 +74,7 @@ class NewsCog(commands.Cog):
         
         view = NewsCog.NewsView(interaction, role)
         embed = discord.Embed(
-            title='Choose one of the WT News languages for this channel:',
+            title='Choose one of the WT News languages for this channel: / Выберите язык Новостей ВарТандера для этого канала:',
             color=0xFFFFFF
         )
         await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
