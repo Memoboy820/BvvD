@@ -37,12 +37,16 @@ class CheckerCog(commands.Cog):
             if rowsyt :
                 for guild_id, channel_id, role_id, language in rowsyt:
                     if language == 'Russian':
-                        languageRu = 'Русского'
+                        languageRu = 'Русскоязычного'
+                    else:
+                        languageRu = 'Англоязычного'
                     embed.add_field(name=f'**{language}** YouTube Pings / Пинги **{languageRu}** Ютуба:', value=f"Channel / Канал: <#{channel_id}> \nPing Role / Роль: <@&{role_id}>", inline=False)
             if rowsnw:
                 for guild_id, channel_id, role_id, language in rowsnw:
                     if language == 'Russian':
                         languageRu = 'Русских'
+                    else:
+                        languageRu = 'Английских'
                     embed.add_field(name=f'**{language}** News Pings / Пинги **{languageRu}** Новостей:', value=f"Channel / Канал: <#{channel_id}> \nPing Role / Роль: <@&{role_id}>", inline=False)
         else:
             embed = discord.Embed(
