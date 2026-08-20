@@ -1,5 +1,5 @@
 # BvvD
-Discord bot for **War Thunder** servers that sends fast notifications about game news and new videos on YouTube
+Discord bot for **War Thunder** servers that sends fast notifications about game news and new videos on YouTube.
 Bot supports **Russian** and **English**, and lets you configure separate channels for YouTube/News pings or send everything into one channel.
 
 ## Features
