@@ -49,8 +49,14 @@ async def setup_hook():
     await bot.load_extension("cogs.News")
     await bot.load_extension("cogs.Checker")
 
-    synced = await bot.tree.sync()
-    print([cmd.name for cmd in synced])
+    guild = discord.Object(id=GUILD_ID)
+
+    global_synced = await bot.tree.sync()
+    print("Global:", [cmd.name for cmd in global_synced])
+
+    bot.tree.copy_global_to(guild=guild)
+    guild_synced = await bot.tree.sync(guild=guild)
+    print("Guild:", [cmd.name for cmd in guild_synced])
 
 bot.setup_hook = setup_hook
 
