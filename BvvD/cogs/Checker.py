@@ -31,7 +31,7 @@ class CheckerCog(commands.Cog):
         conn.close()
         if rowsnw or rowsyt:
             embed = discord.Embed(
-                title='Notification settings',
+                title='Notification Settings / Настройка Пингов',
                 color=0xFFFFFF
             )
             if rowsyt :
