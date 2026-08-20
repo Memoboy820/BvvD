@@ -74,7 +74,8 @@ class NewsCog(commands.Cog):
         
         view = NewsCog.NewsView(interaction, role)
         embed = discord.Embed(
-            title=':flag_us: Choose one of the WT News languages for this channel: \n:flag_ru: Выберите язык Новостей ВарТандера для этого канала:',
+            title='News Pings / Пинги Новостей',
+            description=':flag_us: Choose one of the WT News languages for this channel: \n:flag_ru: Выберите язык Новостей ВарТандера для этого канала:',
             color=0xFFFFFF
         )
         await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
