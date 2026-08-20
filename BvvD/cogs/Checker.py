@@ -36,13 +36,13 @@ class CheckerCog(commands.Cog):
             )
             if rowsyt :
                 for guild_id, channel_id, role_id, language in rowsyt:
-                    embed.add_field(name=f'**{language}** YouTube Pings:', value=f"Channel: <#{channel_id}> \nPing Role: <@&{role_id}>", inline=False)
+                    embed.add_field(name=f'**{language}** YouTube Pings / Пинги Ютуба:', value=f"Channel / Канал: <#{channel_id}> \nPing Role / Роль: <@&{role_id}>", inline=False)
             if rowsnw:
                 for guild_id, channel_id, role_id, language in rowsnw:
-                    embed.add_field(name=f'**{language}** News Pings:', value=f"Channel: <#{channel_id}> \nPing Role: <@&{role_id}>", inline=False)
+                    embed.add_field(name=f'**{language}** News Pings / Пинги Новостей:', value=f"Channel / Канал: <#{channel_id}> \nPing Role / Роль: <@&{role_id}>", inline=False)
         else:
             embed = discord.Embed(
-                title='This server has no pings',
+                title=':flag_us: This server has no pings \n:flag_ru: На данном сервере не установленны пинги',
                 color=0xFFFFFF
             )
         await interaction.response.send_message(embed=embed, ephemeral=True)
