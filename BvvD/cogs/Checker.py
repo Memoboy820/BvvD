@@ -47,6 +47,33 @@ class CheckerCog(commands.Cog):
             )
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
+    @app_commands.command(name='info', description='Info about how this bot works')
+    async def info(self, interaction: discord.Interaction):
+        embed = discord.Embed(
+            title='❓ Как использовать бота Bvvd / How to use BvvD bot: ❓',
+            color=0xFFFFFF
+        )
+        embed.add_field(name=':flag_ru: RUS:',value='- Используйте комманды `"/setyoutubepings"` и `"/setnewspings"` чтобы *задать* данный канал для пингов *Ютуба* или *Новостей* игры *соответственно*' \
+        '\n- Для удаления пингов используйте комманды `"/removeyoutubepings"` и `"/removenewspings"` чтобы *убрать* пинги с данного канала для *Ютуба* или *Новостей*' \
+        '\n- Для просмотра заданных каналов используйте комманду `"/checksettings"`')
+
+        embed.add_field(name=':flag_us: ENG:',value='- Use the `"/setyoutubepings"` and `"/setnewspings"` commands to *set* this channel for *YouTube* or *News* pings'
+        '\n- To remove pings, use the `"/removeyoutubepings"` and `"/removenewspings"` commands to *remove* pings from this channel for *YouTube* or *News*'
+        '\n- To view configured channels, use the `"/checksettings"` command')
+        embed.set_footer(text='Thanks for using BvvD bot❤️')
+
+        embed.set_footer(text='Спасибо что пользуетесь ботом BvvD❤️ / Thanks  for using BvvD bot❤️')
+
+        
+
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+
+
+
+
+
+
 
 async def setup(bot):
     await bot.add_cog(CheckerCog(bot))
