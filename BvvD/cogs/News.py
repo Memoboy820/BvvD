@@ -91,17 +91,35 @@ class NewsCog(commands.Cog):
             channel_id = interaction.channel.id
             role_id = self.view.role_id
             language = self.language
+
+            RUS_URL = "https://store.steampowered.com/events/ajaxgetadjacentpartnerevents/?appid=236390&lang_list=8&count_before=0&count_after=5"
+            ENG_URL = "https://store.steampowered.com/events/ajaxgetadjacentpartnerevents/?appid=236390&lang_list=0&count_before=0&count_after=5"
+
+            if language == 'Russian':
+                MAIN_URL = RUS_URL
+            elif language == 'English':
+                MAIN_URL = ENG_URL
+            else:
+                return
             
             conn = sqlite3.connect("/app/data/databaseNews.db")
             cursor = conn.cursor()
+            
+            response = requests.get(MAIN_URL, timeout=10)
+            response.raise_for_status()
+            data = response.json()
+
+            sent_ids = []
+            for event in data["events"][-4:]:
+                sent_ids.append(str(event["gid"]))     
 
             cursor.execute("""
                 INSERT INTO news_settings (guild_id, channel_id, role_id, language, last_news_id, sent_news_ids)
-                VALUES (?, ?, ?, ?, NULL, NULL)
+                VALUES (?, ?, ?, ?, NULL, ?)
                 ON CONFLICT(guild_id, language) DO UPDATE SET
                     channel_id = excluded.channel_id,
                     role_id = excluded.role_id
-            """, (guild_id, channel_id, role_id, language))
+            """, (guild_id, channel_id, role_id, language, json.dumps(sent_ids)))
 
             conn.commit()
             conn.close()
