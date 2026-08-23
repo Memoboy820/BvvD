@@ -109,9 +109,13 @@ class NewsCog(commands.Cog):
             response.raise_for_status()
             data = response.json()
 
-            sent_ids = []
-            for event in data["events"][-4:]:
-                sent_ids.append(str(event["gid"]))     
+            events_sorted = sorted(
+                data["events"][:5],
+                key=lambda event: event.get("announcement_body", {}).get("posttime", 0),
+                reverse=True
+)
+
+            sent_ids = [str(event["gid"]) for event in events_sorted[1:]]
 
             cursor.execute("""
                 INSERT INTO news_settings (guild_id, channel_id, role_id, language, last_news_id, sent_news_ids)
