@@ -129,7 +129,7 @@ class NewsCog(commands.Cog):
             conn.close()
 
             embed = discord.Embed(color=0xFFFFFF)
-            embed.add_field(name='Done!', value=f'{interaction.channel.mention} is now **set** for **{self.language}** WarThunder News, and will ping members with {self.view.role} role')
+            embed.add_field(name='Done!', value=f'{interaction.channel.mention} is now **set** for **{self.language}** WarThunder News, and will ping members with {self.view.role.mention} role')
             await interaction.response.send_message(embed=embed, ephemeral=True)
                             
             
