@@ -120,7 +120,7 @@ class ForumCog(commands.Cog):
 #----------------------- поиск 
 
 
-    @tasks.loop(seconds=30)
+    @tasks.loop(seconds=15)
     async def forum_checker(self):
 
         conn = sqlite3.connect("/app/data/databaseForum.db")
