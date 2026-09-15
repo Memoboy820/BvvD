@@ -300,7 +300,7 @@ class DataminesCog(commands.Cog):
 
 
                 #if last_datamine_sha == sha:
-                    continue             # ес ниче не изменилось - едем дальше
+                    #continue             # ес ниче не изменилось - едем дальше
                 
 ## -- запрос на разницу прошлой и новой версии
 
@@ -308,7 +308,7 @@ class DataminesCog(commands.Cog):
                 changed_files = compare_data["files"]
 
 ## -- запрос на прогон и фильтрацию инфы через ии
-
+                print('[AI] отправляем запрос')
                 response = ai_client.models.generate_content(
                     model="gemini-3.8-flash",
                     contents=f'{prompt}\nRaw Datamine Changes:\n{changed_files}'
