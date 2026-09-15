@@ -16,7 +16,4 @@ Bot supports **Russian** and **English**, and lets you configure separate channe
 This is a personal learning project that is still in development.
 The core bot features already work, and more improvements will be added over time.
 
-## Notes
 
-Built as a Discord bot project while learning Python and discord.py.
-In the first 5 minutes after setting channel for News bot might send latest 5 news not in correct order (from latest to older), this is not an error and was made so that the bot knows which news is the latest. Because of that i recommend not using @everyone for pinging and not giving people ping roles until bot stops. It should not take longer than 5 mins / 5 pings.
