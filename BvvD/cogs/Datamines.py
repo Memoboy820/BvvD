@@ -267,7 +267,7 @@ class DataminesCog(commands.Cog):
             author = data["commit"]["author"]["name"]
             date = data["commit"]["author"]["date"]
             html_url = data["html_url"]
-            parent_sha = data["parents"][0]["sha"]
+
 
 # -- сверка
 
@@ -303,7 +303,7 @@ class DataminesCog(commands.Cog):
                 
 ## -- запрос на разницу прошлой и новой версии
 
-                compare_data = get_compare_data(parent_sha, sha)
+                compare_data = get_compare_data(last_datamine_sha, sha)
                 changed_files = compare_data["files"]
 
 ## -- запрос на прогон и фильтрацию инфы через ии
