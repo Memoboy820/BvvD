@@ -130,8 +130,7 @@ def short_file_name(path: str) -> str:
     return path.rsplit("/", 1)[-1]
 
 
-
-def get_compare_data(old_sha: str, new_sha: str) -> dict:
+def get_compare_data(old_sha: str, new_sha: str) -> dict:       #сравнение гитов
     url = (
         f"https://api.github.com/repos/{DATAMINE_REPO}/compare/"
         f"{old_sha}...{new_sha}"
@@ -242,7 +241,7 @@ class DataminesCog(commands.Cog):
 #----------------------- поиск 
 
 
-    @tasks.loop(minutes=10)
+    @tasks.loop(minutes=15)
     async def datamines_checker(self):
         try:
 
@@ -299,8 +298,8 @@ class DataminesCog(commands.Cog):
                     continue
 
 
-                #if last_datamine_sha == sha:
-                    #continue             # ес ниче не изменилось - едем дальше
+                if last_datamine_sha == sha:
+                    continue             # ес ниче не изменилось - едем дальше
                 
 ## -- запрос на разницу прошлой и новой версии
 
@@ -308,9 +307,9 @@ class DataminesCog(commands.Cog):
                 changed_files = compare_data["files"]
 
 ## -- запрос на прогон и фильтрацию инфы через ии
-                print('[AI] отправляем запрос')
+
                 response = ai_client.models.generate_content(
-                    model="gemini-3.5-flash-lite",
+                    model="gemini-3.8-flash",
                     contents=f'{prompt}\nRaw Datamine Changes:\n{changed_files}'
                 )
                 ai_text = response.text
@@ -318,7 +317,7 @@ class DataminesCog(commands.Cog):
                 print(ai_text[:3800])
                 channel = self.bot.get_channel(channel_id)
                 if channel is not None:
-                    await channel.send(content=ai_text[:3800])
+                    await channel.send(content=f"<@&{role_id}> \n# {message}: \n{ai_text[:3780]}\n\n**Data sourced from gszabi99's War Thunder Datamine repository** \n*📍Provided by BvvD bot*")
 
 # -- отправка
 
