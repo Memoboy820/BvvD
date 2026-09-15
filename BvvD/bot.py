@@ -48,7 +48,7 @@ async def setup_hook():
     await bot.load_extension("cogs.YouTube")
     await bot.load_extension("cogs.News")
     await bot.load_extension("cogs.Checker")
-    await bot.load_extension("cogs.Forum")
+    await bot.load_extension("cogs.Datamines")
 
     guild = discord.Object(id=GUILD_ID)
 
