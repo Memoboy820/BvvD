@@ -39,6 +39,7 @@ prompt = """
                     14. If a value is unclear, malformed, or cannot be copied exactly, omit that specific field.
                     15. Do not replace 3.0 with 0.3, 0.0, 3, or any other representation unless the raw data explicitly contains that value.
                     16. Do not merge values from different files or objects.
+
                     IGNORE completely:
 
                     - localization files;
@@ -269,7 +270,7 @@ class DataminesCog(commands.Cog):
             sha = data["sha"]
             message = data["commit"]["message"]
             author = data["commit"]["author"]["name"]
-            date = data["commit"]["author"]["date"]
+            date = data["commit"]["author"]["date"] #для будущих обновлений
             html_url = data["html_url"]
 
 
@@ -317,14 +318,21 @@ class DataminesCog(commands.Cog):
                     contents=f'{prompt}\nRaw Datamine Changes:\n{changed_files}'
                 )
                 ai_text = response.text
-
-                print(ai_text[:3800])
+# -- отправка
                 channel = self.bot.get_channel(channel_id)
                 if channel is not None:
                     await channel.send(content=f"<@&{role_id}> \n# {message}: \n{ai_text[:3780]}\n\n**Data sourced from gszabi99's War Thunder Datamine repository** \n*📍Provided by BvvD bot*")
 
-# -- отправка
-
+# -- запись
+                conn = sqlite3.connect("/app/data/datamines.db")
+                cursor = conn.cursor()
+                cursor.execute("""
+                    UPDATE datamines_settings
+                    SET last_datamine_sha = ?
+                    WHERE guild_id = ? AND channel_id = ?
+""", (sha, guild_id, channel_id))
+                conn.commit()
+                conn.close()
 
 
         except requests.RequestException as e:
