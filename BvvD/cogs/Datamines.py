@@ -310,7 +310,7 @@ class DataminesCog(commands.Cog):
 ## -- запрос на прогон и фильтрацию инфы через ии
                 print('[AI] отправляем запрос')
                 response = ai_client.models.generate_content(
-                    model="gemini-3.8-flash",
+                    model="gemini-3.5-flash-lite",
                     contents=f'{prompt}\nRaw Datamine Changes:\n{changed_files}'
                 )
                 ai_text = response.text
