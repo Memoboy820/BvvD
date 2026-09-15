@@ -34,7 +34,11 @@ prompt = """
                     10. Do not use a Markdown title with #.
                     11. Return only the final Discord text. No explanations before
                         or after it.
-
+                    12. Never alter, round, calculate, reinterpret, or normalize a numeric value.
+                    13. Copy every number, unit, identifier, and old → new value exactly as written in the raw data.
+                    14. If a value is unclear, malformed, or cannot be copied exactly, omit that specific field.
+                    15. Do not replace 3.0 with 0.3, 0.0, 3, or any other representation unless the raw data explicitly contains that value.
+                    16. Do not merge values from different files or objects.
                     IGNORE completely:
 
                     - localization files;
