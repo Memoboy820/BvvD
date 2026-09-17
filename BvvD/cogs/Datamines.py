@@ -6,6 +6,7 @@ import os
 import discord
 import requests
 import sqlite3
+import  json
 
 
 load_dotenv()
@@ -29,16 +30,14 @@ prompt = """
                     5. Do not claim that changes are already active on the live server.
                     6. Do not make predictions.
                     7. Do not mention that you are an AI.
-                    8. Do not output JSON.
                     9. Do not use emoji.
                     10. Do not use a Markdown title with #.
-                    11. Return only the final Discord text. No explanations before
-                        or after it.
-                    12. Never alter, round, calculate, reinterpret, or normalize a numeric value.
-                    13. Copy every number, unit, identifier, and old → new value exactly as written in the raw data.
-                    14. If a value is unclear, malformed, or cannot be copied exactly, omit that specific field.
-                    15. Do not replace 3.0 with 0.3, 0.0, 3, or any other representation unless the raw data explicitly contains that value.
-                    16. Do not merge values from different files or objects.
+                    11. Return only the final Discord text. No explanations before or after it.
+                    11. Never alter, round, calculate, reinterpret, or normalize a numeric value.
+                    12. Copy every number, unit, identifier, and old → new value exactly as written in the raw data.
+                    13. If a value is unclear, malformed, or cannot be copied exactly, omit that specific field.
+                    14. Do not replace 3.0 with 0.3, 0.0, 3, or any other representation unless the raw data explicitly contains that value.
+                    15. Do not merge values from different files or objects.
 
                     IGNORE completely:
 
@@ -78,6 +77,22 @@ prompt = """
                     - vehicle removals.
 
                     OUTPUT FORMAT:
+
+                    Split the following text into a list of strings for sending with a Discord bot.
+
+                    Requirements:
+                    - Return only a valid JSON array of strings, with no Markdown, explanations, or ```json code fences.
+                    - Each array element must be a standalone message fragment.
+                    - Each fragment must be no more than 1900 characters long, including spaces and line breaks.
+                    - Preserve the original text without shortening it, omitting anything, or adding facts.
+                    - Prefer splitting at paragraph boundaries.
+                    - If a paragraph does not fit, split it at sentence boundaries.
+                    - If a sentence exceeds the limit, split it at word boundaries.
+                    - Do not leave empty strings as separate array elements.
+                    - Avoid splitting Markdown links, inline code enclosed in backticks, and lists whenever possible.
+                    - Every fragment must be ready to pass directly to channel.send(...)
+
+                    TEXT FORMAT:
 
                     Start directly with a concise summary sentence.
 
@@ -179,7 +194,7 @@ class DataminesCog(commands.Cog):
         conn.commit()
         conn.close()
 
-#---------------------- КОММАНДЫ 
+#---------------------- КОМАНДЫ 
 #-- добавление
 
     @app_commands.command(name='setdataminespings', description="Sets pings for changes in game's files")
@@ -279,13 +294,34 @@ class DataminesCog(commands.Cog):
             conn = sqlite3.connect("/app/data/datamines.db")
             cursor = conn.cursor()
             cursor.execute("""
-                SELECT guild_id, channel_id, role_id, last_datamine_sha, previous_datamine_sha
+                SELECT guild_id, channel_id, role_id, last_datamine_sha
                 FROM datamines_settings
             """)
             rows = cursor.fetchall()
             conn.close()
 
-            for guild_id, channel_id, role_id, last_datamine_sha, previous_datamine_sha in rows:
+            if not rows:    # на присутствие  
+                return
+
+            
+            if rows[0][3] is None:                  # на ша
+                conn = sqlite3.connect("/app/data/datamines.db")
+                cursor = conn.cursor()
+
+                cursor.execute("""
+                    UPDATE datamines_settings
+                    SET last_datamine_sha = ?
+                """, (sha,))
+
+                conn.commit()
+                conn.close()
+                return
+
+            
+            if rows[0][3] == sha: # на новую версию
+                return 
+
+            for guild_id, channel_id, role_id, last_datamine_sha in rows:
 
                 if last_datamine_sha is None:  # первый запуск
 
@@ -301,27 +337,26 @@ class DataminesCog(commands.Cog):
                     conn.commit()
                     conn.close()
                     continue
-
-
-                if last_datamine_sha == sha:
-                    continue             # ес ниче не изменилось - едем дальше
                 
 ## -- запрос на разницу прошлой и новой версии
 
-                compare_data = get_compare_data(last_datamine_sha, sha)
-                changed_files = compare_data["files"]
+            compare_data = get_compare_data(last_datamine_sha, sha)
+            changed_files = compare_data["files"]
 
 ## -- запрос на прогон и фильтрацию инфы через ии
 
-                response = ai_client.models.generate_content(
-                    model="gemini-3.8-flash",
-                    contents=f'{prompt}\nRaw Datamine Changes:\n{changed_files}'
-                )
-                ai_text = response.text
+            response = ai_client.models.generate_content(
+                model="gemini-3.8-flash",
+                contents=f'{prompt}\nRaw Datamine Changes:\n{changed_files}'
+            )
+            ai_text_list = json.loads(response.text)
 # -- отправка
+            for guild_id, channel_id, role_id, last_datamine_sha in rows:
                 channel = self.bot.get_channel(channel_id)
                 if channel is not None:
-                    await channel.send(content=f"<@&{role_id}> \n# {message}: \n{ai_text[:3780]}\n\n**Data sourced from gszabi99's War Thunder Datamine repository** \n*📍Provided by BvvD bot*")
+                    for text in ai_text_list:
+                        await channel.send(content=f"<@&{role_id}> \n# {message}: \n{text[:2000]}")
+                        await channel.send(content=f"**Data sourced from gszabi99's War Thunder Datamine repository** \n*📍Provided by BvvD bot*")
 
 # -- запись
                 conn = sqlite3.connect("/app/data/datamines.db")
