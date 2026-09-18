@@ -355,8 +355,9 @@ class DataminesCog(commands.Cog):
             for guild_id, channel_id, role_id, last_datamine_sha in rows:
                 channel = self.bot.get_channel(channel_id)
                 if channel is not None:
+                    await channel.send(content=f'<@&{role_id}>')
                     for text in ai_text_list:
-                        await channel.send(content=f"<@&{role_id}> \n# {message}: \n{text[:2000]}")
+                        await channel.send(content=f"# {message}: \n{text[:2000]}")
                         await channel.send(content=f"**Data sourced from gszabi99's War Thunder Datamine repository** \n*📍Provided by BvvD bot*")
 
 # -- запись
