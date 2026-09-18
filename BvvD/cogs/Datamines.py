@@ -182,8 +182,6 @@ class DataminesCog(commands.Cog):
         conn = sqlite3.connect("/app/data/datamines.db")
 
         cursor = conn.cursor()
-        cursor.execute("DROP TABLE IF EXISTS forum_settings")
-        cursor.execute("DROP TABLE IF EXISTS datamines_settings")
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS datamines_settings (
             guild_id INTEGER NOT NULL,
@@ -349,7 +347,7 @@ class DataminesCog(commands.Cog):
 ## -- запрос на прогон и фильтрацию инфы через ии
 
             response = ai_client.models.generate_content(
-                model="gemini-3.5-flash",
+                model="gemini-3.5-flash-lite",
                 contents=f'{prompt}\nRaw Datamine Changes:\n{changed_files}'
             )
             ai_text_list = json.loads(response.text)
