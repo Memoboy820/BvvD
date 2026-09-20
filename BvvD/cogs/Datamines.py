@@ -82,9 +82,8 @@ prompt = """
 
                     Requirements:
                     - Return only a valid JSON array of strings, with no Markdown, explanations, or ```json code fences.
-                    - Each array element must be a standalone message fragment.
+                    - Each array element must be a complete, standalone Discord message ready to pass directly to channel.send(...).
                     - Each fragment must be no more than 1900 characters long, including spaces and line breaks.
-                    - Preserve the original text without shortening it, omitting anything, or adding facts.
                     - Prefer splitting at paragraph boundaries.
                     - If a paragraph does not fit, split it at sentence boundaries.
                     - If a sentence exceeds the limit, split it at word boundaries.
@@ -113,9 +112,7 @@ prompt = """
                     Requirements:
 
                     - Use English.
-                    - Maximum total length: 3500 characters.
-                    - Maximum 8 sections.
-                    - Maximum 5 bullet points per section.
+                    - Return no more than 5 array elements.
                     - Use short bullet points.
                     - Do not show raw file paths unless the object name cannot be determined.
                     - Do not show raw .blkx syntax if it can be simplified.
@@ -125,7 +122,7 @@ prompt = """
                     - If no player-relevant changes are present, return exactly:
                     No player-relevant datamine changes detected.
 
-                    Always end with exactly this line:
+                    Always end with exactly this line only in the last text fragment:
 
                     Datamine information from client files. Not an official announcement.
                     """
@@ -140,6 +137,14 @@ GITHUB_HEADERS = {
     "User-Agent": "BvvD-Datamine-Tracker",
 }
 
+models = (
+    "gemini-3.5-flash-lite",
+    "gemini-3.5-flash",
+    "gemini-3-flash",
+    "gemini-2.5-flash",
+    "gemini-2.5-pro",
+    "gemini-2-flash"
+)
 
 
 ai_client = genai.Client(
@@ -149,6 +154,21 @@ ai_client = genai.Client(
 def short_file_name(path: str) -> str:
     return path.rsplit("/", 1)[-1]
 
+def get_ai_response(prompt: str, changed_files: str):
+    for model in models:
+        try:
+            response = ai_client.models.generate_content(
+            model=model,
+            contents=f'{prompt}\nRaw Datamine Changes:\n{changed_files}',
+            config={"response_mime_type": "application/json"}
+        )
+            ai_text_list = json.loads(response.text)
+            return ai_text_list
+        except Exception as e:
+            print(f'{model} - {e}')
+    return None
+
+        
 
 def get_compare_data(old_sha: str, new_sha: str) -> dict:       #сравнение гитов
     url = (
@@ -346,16 +366,14 @@ class DataminesCog(commands.Cog):
 
 ## -- запрос на прогон и фильтрацию инфы через ии
 
-            response = ai_client.models.generate_content(
-                model="gemini-3.5-flash-lite",
-                contents=f'{prompt}\nRaw Datamine Changes:\n{changed_files}'
-            )
-            ai_text_list = json.loads(response.text)
+            ai_text_list = get_ai_response(prompt, changed_files)
+
 # -- отправка
             for guild_id, channel_id, role_id, last_datamine_sha in rows:
                 channel = self.bot.get_channel(channel_id)
                 if channel is not None:
-                    await channel.send(content=f'<@&{role_id}>')
+                    if 'No player-relevant datamine changes detected' in ai_text_list:
+                        await channel.send(content=f'<@&{role_id}>')
                     for text in ai_text_list:
                         await channel.send(content=f"# {message}: \n{text[:2000]}")
                         await channel.send(content=f"**Data sourced from gszabi99's War Thunder Datamine repository** \n*📍Provided by BvvD bot*")
