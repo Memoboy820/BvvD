@@ -372,11 +372,14 @@ class DataminesCog(commands.Cog):
             for guild_id, channel_id, role_id, last_datamine_sha in rows:
                 channel = self.bot.get_channel(channel_id)
                 if channel is not None:
-                    if 'No player-relevant datamine changes detected' in ai_text_list:
-                        await channel.send(content=f'<@&{role_id}>')
-                    for text in ai_text_list:
-                        await channel.send(content=f"# {message}: \n{text[:1950]}")
-                        await channel.send(content=f"**Data sourced from gszabi99's War Thunder Datamine repository** \n*📍Provided by BvvD bot*")
+                    try:
+                        if 'No player-relevant datamine changes detected' in ai_text_list:
+                            await channel.send(content=f'<@&{role_id}>')
+                        for text in ai_text_list:
+                            await channel.send(content=f"# {message}: \n{text[:1950]}")
+                            await channel.send(content=f"**Data sourced from gszabi99's War Thunder Datamine repository** \n*📍Provided by BvvD bot*")
+                    except Exception as e:
+                        print(f'[SEND] - {e}')
 
 # -- запись
                 conn = sqlite3.connect("/app/data/datamines.db")
