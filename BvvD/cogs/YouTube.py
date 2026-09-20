@@ -197,7 +197,7 @@ class YouTubeCog(commands.Cog):
                     live = item["snippet"].get("liveBroadcastContent", "none")
                     published_at = item["snippet"]["publishedAt"]
 
-                    print(f"[YT] guild={guild_id} language={language} last={last_video_id} current={current_video_id}")
+
 
                     thumbs = item["snippet"]["thumbnails"]
                     if "maxres" in thumbs:
