@@ -375,7 +375,7 @@ class DataminesCog(commands.Cog):
                     if 'No player-relevant datamine changes detected' in ai_text_list:
                         await channel.send(content=f'<@&{role_id}>')
                     for text in ai_text_list:
-                        await channel.send(content=f"# {message}: \n{text[:2000]}")
+                        await channel.send(content=f"# {message}: \n{text[:1950]}")
                         await channel.send(content=f"**Data sourced from gszabi99's War Thunder Datamine repository** \n*📍Provided by BvvD bot*")
 
 # -- запись
