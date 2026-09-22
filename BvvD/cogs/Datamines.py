@@ -168,7 +168,14 @@ def get_ai_response(prompt: str, changed_files: str):
             print(f'{model} - {e}')
     return None
 
-        
+
+async def kd_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError):
+    if isinstance(error, app_commands.CommandOnCooldown):
+        await interaction.response.send_message(
+            "10 second command cooldown",
+            ephemeral=True
+        )
+
 
 def get_compare_data(old_sha: str, new_sha: str) -> dict:       #сравнение гитов
     url = (
@@ -199,9 +206,11 @@ class DataminesCog(commands.Cog):
     def init_db(self):
         
         os.makedirs("/app/data", exist_ok=True)
-        conn = sqlite3.connect("/app/data/datamines.db")
+        conn = sqlite3.connect("/app/data/datamines.db", timeout=10)
 
         cursor = conn.cursor()
+        cursor.execute("PRAGMA journal_mode = WAL;")
+
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS datamines_settings (
             guild_id INTEGER NOT NULL,
@@ -219,22 +228,25 @@ class DataminesCog(commands.Cog):
 #-- добавление
 
     @app_commands.command(name='setdataminespings', description="Sets pings for changes in game's files")
+    @app_commands.checks.cooldown(1, 10, key=lambda interaction: interaction.guild_id)
     async def setdataminepings(self, interaction: discord.Interaction, role: discord.Role):
         role_id = role.id
         channel_id = interaction.channel.id
         guild_id = interaction.guild.id
 
-        conn = sqlite3.connect("/app/data/datamines.db")
+        conn = sqlite3.connect("/app/data/datamines.db", timeout=10)
         cursor = conn.cursor()
-        cursor.execute("""
-            INSERT INTO datamines_settings (guild_id, channel_id, role_id)
-            VALUES (?, ?, ?)
-            ON CONFLICT(guild_id, channel_id) DO UPDATE SET
-                channel_id = excluded.channel_id,
-                role_id = excluded.role_id
-        """, (guild_id, channel_id, role_id))
-        conn.commit()
-        conn.close()
+        try:
+            cursor.execute("""
+                INSERT INTO datamines_settings (guild_id, channel_id, role_id)
+                VALUES (?, ?, ?)
+                ON CONFLICT(guild_id, channel_id) DO UPDATE SET
+                    channel_id = excluded.channel_id,
+                    role_id = excluded.role_id
+            """, (guild_id, channel_id, role_id))
+            conn.commit()
+        finally:
+            conn.close()
 
         embed = discord.Embed(color=0xFFFFFF)
         embed.add_field(
@@ -247,36 +259,38 @@ class DataminesCog(commands.Cog):
 # -- удаление
 
     @app_commands.command(name='removedataminespings', description='Removes datamine pings from this channel')
+    @app_commands.checks.cooldown(1, 10, key=lambda interaction: interaction.guild_id)
     async def removedataminespings(self, interaction: discord.Interaction):
-        conn = sqlite3.connect("/app/data/datamines.db")
+        conn = sqlite3.connect("/app/data/datamines.db", timeout=10)
         cursor = conn.cursor()
-        cursor.execute("""
-            SELECT channel_id FROM datamines_settings
-            WHERE guild_id = ?;
-        """, (interaction.guild.id,))
-        rows = cursor.fetchall()
-        channel_ids = [row[0] for row in rows]
-
-        if interaction.channel.id in channel_ids:
+        try:
             cursor.execute("""
-                DELETE FROM datamines_settings
-                WHERE channel_id = ?;
-            """, (interaction.channel.id,))
+                SELECT channel_id FROM datamines_settings
+                WHERE guild_id = ?;
+            """, (interaction.guild.id,))
+            rows = cursor.fetchall()
+            channel_ids = [row[0] for row in rows]
 
-            embed1 = discord.Embed(
-                title=f'**Removed all** Datamines pings from <#{interaction.channel.id}>',
-                color=0xFFFFFF
-            )
-            await interaction.response.send_message(embed=embed1, ephemeral=True)
-        else:
-            embed2 = discord.Embed(
-                title='This channel is **not** set for any **Datamines** pings',
-                color=0xFFFFFF
-            )
-            await interaction.response.send_message(embed=embed2, ephemeral=True)
+            if interaction.channel.id in channel_ids:
+                cursor.execute("""
+                    DELETE FROM datamines_settings
+                    WHERE channel_id = ?;
+                """, (interaction.channel.id,))
 
-        conn.commit()
-        conn.close()
+                embed1 = discord.Embed(
+                    title=f'**Removed all** Datamines pings from <#{interaction.channel.id}>',
+                    color=0xFFFFFF
+                )
+                await interaction.response.send_message(embed=embed1, ephemeral=True)
+            else:
+                embed2 = discord.Embed(
+                    title='This channel is **not** set for any **Datamines** pings',
+                    color=0xFFFFFF
+                )
+                await interaction.response.send_message(embed=embed2, ephemeral=True)
+            conn.commit()
+        finally:
+            conn.close()
 
 
 #----------------------- поиск 
@@ -312,7 +326,7 @@ class DataminesCog(commands.Cog):
 
 # -- сверка
 
-            conn = sqlite3.connect("/app/data/datamines.db")
+            conn = sqlite3.connect("/app/data/datamines.db", timeout=10)
             cursor = conn.cursor()
             cursor.execute("""
                 SELECT guild_id, channel_id, role_id, last_datamine_sha
@@ -326,7 +340,7 @@ class DataminesCog(commands.Cog):
 
             
             if rows[0][3] is None:                  # на ша
-                conn = sqlite3.connect("/app/data/datamines.db")
+                conn = sqlite3.connect("/app/data/datamines.db", timeout=10)
                 cursor = conn.cursor()
 
                 cursor.execute("""
@@ -346,7 +360,7 @@ class DataminesCog(commands.Cog):
 
                 if last_datamine_sha is None:  # первый запуск
 
-                    conn = sqlite3.connect("/app/data/datamines.db")
+                    conn = sqlite3.connect("/app/data/datamines.db", timeout=10)
                     cursor = conn.cursor()
 
                     cursor.execute("""
@@ -373,7 +387,7 @@ class DataminesCog(commands.Cog):
                 channel = self.bot.get_channel(channel_id)
                 if channel is not None:
                     try:
-                        if 'No player-relevant datamine changes detected' not in ai_text_list:
+                        if 'No player-relevant datamine changes detected.' not in ai_text_list:
                             await channel.send(content=f'<@&{role_id}>')
                         for text in ai_text_list:
                             await channel.send(content=f"# {message}: \n{text[:1950]}")
@@ -382,7 +396,7 @@ class DataminesCog(commands.Cog):
                         print(f'[SEND] - {e}')
 
 # -- запись
-                conn = sqlite3.connect("/app/data/datamines.db")
+                conn = sqlite3.connect("/app/data/datamines.db", timeout=10)
                 cursor = conn.cursor()
                 cursor.execute("""
                     UPDATE datamines_settings
@@ -401,6 +415,9 @@ class DataminesCog(commands.Cog):
     @datamines_checker.before_loop
     async def before_check_datamines(self):
         await self.bot.wait_until_ready()
+
+DataminesCog.setdataminepings.error(kd_error)
+DataminesCog.removedataminespings.error(kd_error)
 
 async def setup(bot):
     await bot.add_cog(DataminesCog(bot))
