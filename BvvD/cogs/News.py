@@ -10,6 +10,15 @@ import json
 
 load_dotenv()
 
+
+async def kd_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError):
+    if isinstance(error, app_commands.CommandOnCooldown):
+        await interaction.response.send_message(
+            "10 second command cooldown",
+            ephemeral=True
+        )
+
+
 def bbcode_to_discord(text: str) -> str:
     text = text.replace('{STEAM_CLAN_IMAGE}', 'https://clan.akamai.steamstatic.com/images')
     text = re.sub(r'\[img\s+src="[^"]+"\]\[/img\]', '', text, flags=re.IGNORECASE)
@@ -46,9 +55,10 @@ class NewsCog(commands.Cog):
 
     def init_db(self):
         os.makedirs("/app/data", exist_ok=True)
-        conn = sqlite3.connect("/app/data/databaseNews.db")
+        conn = sqlite3.connect("/app/data/databaseNews.db", timeout=10)
 
         cursor = conn.cursor()
+        cursor.execute("PRAGMA journal_mode = WAL;")
 
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS news_settings (
@@ -70,6 +80,7 @@ class NewsCog(commands.Cog):
         conn.close()
 
     @app_commands.command(name='setnewspings', description='Sets channel for WT news')
+    @app_commands.checks.cooldown(1, 10, key=lambda interaction: interaction.guild_id)
     async def setnews(self, interaction: discord.Interaction, role: discord.Role):
         
         view = NewsCog.NewsView(interaction, role)
@@ -87,6 +98,11 @@ class NewsCog(commands.Cog):
             self.language = language
 
         async def callback(self, interaction):
+            for item in self.view.children:
+                item.disabled = True
+            await interaction.response.edit_message(view=self.view)
+
+
             guild_id = interaction.guild.id
             channel_id = interaction.channel.id
             role_id = self.view.role_id
@@ -102,35 +118,36 @@ class NewsCog(commands.Cog):
             else:
                 return
             
-            conn = sqlite3.connect("/app/data/databaseNews.db")
+            conn = sqlite3.connect("/app/data/databaseNews.db", timeout=10)
             cursor = conn.cursor()
-            
-            response = requests.get(MAIN_URL, timeout=10)
-            response.raise_for_status()
-            data = response.json()
+            try:
+                response = requests.get(MAIN_URL, timeout=10)
+                response.raise_for_status()
+                data = response.json()
 
-            events_sorted = sorted(
-                data["events"][:5],
-                key=lambda event: event.get("announcement_body", {}).get("posttime", 0),
-                reverse=True
-)
+                events_sorted = sorted(
+                    data["events"][:5],
+                    key=lambda event: event.get("announcement_body", {}).get("posttime", 0),
+                    reverse=True
+    )
 
-            sent_ids = [str(event["gid"]) for event in events_sorted[1:]]
+                sent_ids = [str(event["gid"]) for event in events_sorted[1:]]
 
-            cursor.execute("""
-                INSERT INTO news_settings (guild_id, channel_id, role_id, language, last_news_id, sent_news_ids)
-                VALUES (?, ?, ?, ?, NULL, ?)
-                ON CONFLICT(guild_id, language) DO UPDATE SET
-                    channel_id = excluded.channel_id,
-                    role_id = excluded.role_id
-            """, (guild_id, channel_id, role_id, language, json.dumps(sent_ids)))
+                cursor.execute("""
+                    INSERT INTO news_settings (guild_id, channel_id, role_id, language, last_news_id, sent_news_ids)
+                    VALUES (?, ?, ?, ?, NULL, ?)
+                    ON CONFLICT(guild_id, language) DO UPDATE SET
+                        channel_id = excluded.channel_id,
+                        role_id = excluded.role_id
+                """, (guild_id, channel_id, role_id, language, json.dumps(sent_ids)))
 
-            conn.commit()
-            conn.close()
+                conn.commit()
+            finally:
+                conn.close()
 
             embed = discord.Embed(color=0xFFFFFF)
-            embed.add_field(name='Done!', value=f'{interaction.channel.mention} is now **set** for **{self.language}** WarThunder News, and will ping members with {self.view.role.mention} role')
-            await interaction.response.send_message(embed=embed, ephemeral=True)
+            embed.add_field(name='Done!', value=f'{interaction.channel.mention} is now **set** for **{self.language}** WarThunder News, and will ping members with {self.view.role} role')
+            await interaction.followup.send(embed=embed, ephemeral=True)
                             
             
 
@@ -154,37 +171,40 @@ class NewsCog(commands.Cog):
 
 
     @app_commands.command(name='removenewspings', description='Removes News pings from this channel')
+    @app_commands.checks.cooldown(1, 10, key=lambda interaction: interaction.guild_id)
     async def removenewspings(self, interaction: discord.Interaction):
-        conn = sqlite3.connect("/app/data/databaseNews.db")
+        conn = sqlite3.connect("/app/data/databaseNews.db", timeout=10)
         cursor = conn.cursor()
 
-        cursor.execute("""
-            SELECT channel_id FROM news_settings
-            WHERE guild_id = ?;
-    """,(interaction.guild.id,))
-        rows = cursor.fetchall()
-        channel_ids = [row[0] for row in rows]
-
-        if interaction.channel.id in channel_ids:
+        try:
             cursor.execute("""
-                DELETE FROM news_settings
-                WHERE channel_id = ?;
-            """,(interaction.channel.id,))
+                SELECT channel_id FROM news_settings
+                WHERE guild_id = ?;
+        """,(interaction.guild.id,))
+            rows = cursor.fetchall()
+            channel_ids = [row[0] for row in rows]
 
-            embed1 = discord.Embed(
-                title=f'**Removed all** News pings from <#{interaction.channel.id}>',
-                color=0xFFFFFF
-            )
-            await interaction.response.send_message(embed=embed1, ephemeral=True)
-        else:
-            embed2 = discord.Embed(
-                title='This channel is **not** set for any **News** pings',
-                color=0xFFFFFF
-            )
-            await interaction.response.send_message(embed=embed2, ephemeral=True)
+            if interaction.channel.id in channel_ids:
+                cursor.execute("""
+                    DELETE FROM news_settings
+                    WHERE channel_id = ?;
+                """,(interaction.channel.id,))
 
-        conn.commit()
-        conn.close()
+                embed1 = discord.Embed(
+                    title=f'**Removed all** News pings from <#{interaction.channel.id}>',
+                    color=0xFFFFFF
+                )
+                await interaction.response.send_message(embed=embed1, ephemeral=True)
+            else:
+                embed2 = discord.Embed(
+                    title='This channel is **not** set for any **News** pings',
+                    color=0xFFFFFF
+                )
+                await interaction.response.send_message(embed=embed2, ephemeral=True)
+
+            conn.commit()
+        finally:
+            conn.close()
 
 
 
@@ -200,15 +220,16 @@ class NewsCog(commands.Cog):
         RUS_URL = "https://store.steampowered.com/events/ajaxgetadjacentpartnerevents/?appid=236390&lang_list=8&count_before=0&count_after=5"
         ENG_URL = "https://store.steampowered.com/events/ajaxgetadjacentpartnerevents/?appid=236390&lang_list=0&count_before=0&count_after=5"
 
-        conn = sqlite3.connect("/app/data/databaseNews.db")
+        conn = sqlite3.connect("/app/data/databaseNews.db", timeout=10)
         cursor = conn.cursor()
 
-        cursor.execute("""
-            SELECT guild_id, channel_id, role_id, last_news_id, sent_news_ids, language from news_settings
-        """)
-        rows = cursor.fetchall()
-        conn.commit()
-        conn.close()
+        try:
+            cursor.execute("""
+                SELECT guild_id, channel_id, role_id, last_news_id, sent_news_ids, language from news_settings
+            """)
+            rows = cursor.fetchall()
+        finally:
+            conn.close()
 
         for guild_id, channel_id, role_id, last_news_id, sent_news_ids, language in rows:
             try:
@@ -247,20 +268,22 @@ class NewsCog(commands.Cog):
                 current_news_id = selected_event["gid"]
                 app_id = selected_event["appid"]
 
-                conn = sqlite3.connect("/app/data/databaseNews.db")
+                conn = sqlite3.connect("/app/data/databaseNews.db", timeout=10)
                 cursor = conn.cursor()
 
-                sent_ids.append(current_news_id)
-                sent_ids = list(dict.fromkeys(sent_ids))[-20:]
+                try:
+                    sent_ids.append(current_news_id)
+                    sent_ids = list(dict.fromkeys(sent_ids))[-20:]
 
-                cursor.execute("""
-                    UPDATE news_settings
-                    SET last_news_id = ?, sent_news_ids = ?
-                    WHERE channel_id = ? AND language = ?
+                    cursor.execute("""
+                        UPDATE news_settings
+                        SET last_news_id = ?, sent_news_ids = ?
+                        WHERE channel_id = ? AND language = ?
 
-                """, (current_news_id, json.dumps(sent_ids), channel_id, language))
-                conn.commit()
-                conn.close()
+                    """, (current_news_id, json.dumps(sent_ids), channel_id, language))
+                    conn.commit()
+                finally:
+                    conn.close()
 
                 embed = discord.Embed(
                     title=event_name,
@@ -285,50 +308,9 @@ class NewsCog(commands.Cog):
     @check_news.before_loop
     async def before_check_news(self):
         await self.bot.wait_until_ready()
-                
 
-            
-
-
-
-
-        
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+NewsCog.setnews.error(kd_error)
+NewsCog.removenewspings.error(kd_error)
 
 async def setup(bot):
     await bot.add_cog(NewsCog(bot))
