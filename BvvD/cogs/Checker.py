@@ -16,39 +16,42 @@ class CheckerCog(commands.Cog):
 
 # -- поиск в бд ютуба
 
-        conn = sqlite3.connect("/app/data/database.db")
+        conn = sqlite3.connect("/app/data/database.db", timeout=10)
         cursor = conn.cursor()
-        cursor.execute("""
-            SELECT guild_id, channel_id, role_id, language FROM youtube_settings
-            WHERE guild_id = ?
-""", (guildid,))
-        rowsyt = cursor.fetchall()
-        conn.commit()
-        conn.close()
+        try:
+            cursor.execute("""
+                SELECT guild_id, channel_id, role_id, language FROM youtube_settings
+                WHERE guild_id = ?
+    """, (guildid,))
+            rowsyt = cursor.fetchall()
+        finally:
+            conn.close()
 
 # -- поиск в бд новостей
 
-        conn = sqlite3.connect("/app/data/databaseNews.db")
+        conn = sqlite3.connect("/app/data/databaseNews.db", timeout=10)
         cursor = conn.cursor()
-        cursor.execute("""
-            SELECT guild_id, channel_id, role_id, language FROM news_settings
-            WHERE guild_id = ?
-""", (guildid,))
-        rowsnw = cursor.fetchall()
-        conn.commit()
-        conn.close()
+        try:
+            cursor.execute("""
+                SELECT guild_id, channel_id, role_id, language FROM news_settings
+                WHERE guild_id = ?
+    """, (guildid,))
+            rowsnw = cursor.fetchall()
+        finally:
+            conn.close()
 
 # -- поиск в бд датамайн
 
-        conn = sqlite3.connect("/app/data/datamines.db")
+        conn = sqlite3.connect("/app/data/datamines.db", timeout=10)
         cursor = conn.cursor()
-        cursor.execute("""
-            SELECT guild_id, channel_id, role_id FROM datamines_settings
-            WHERE guild_id = ?
-""", (guildid,))
-        rowsdtmns = cursor.fetchall()
-        conn.commit()
-        conn.close()
+        try:
+            cursor.execute("""
+                SELECT guild_id, channel_id, role_id FROM datamines_settings
+                WHERE guild_id = ?
+    """, (guildid,))
+            rowsdtmns = cursor.fetchall()
+        finally:
+            conn.close()
 
 # ------------- создание ембеда
 
