@@ -210,7 +210,7 @@ class DataminesCog(commands.Cog):
 
         cursor = conn.cursor()
         cursor.execute("PRAGMA journal_mode = WAL;")
-
+        cursor.execute("DROP TABLE IF EXISTS datamines_settings;")
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS datamines_settings (
             guild_id INTEGER NOT NULL,
@@ -240,7 +240,7 @@ class DataminesCog(commands.Cog):
             cursor.execute("""
                 INSERT INTO datamines_settings (guild_id, channel_id, role_id)
                 VALUES (?, ?, ?)
-                ON CONFLICT(guild_id, channel_id) DO UPDATE SET
+                ON CONFLICT(guild_id) DO UPDATE SET
                     channel_id = excluded.channel_id,
                     role_id = excluded.role_id
             """, (guild_id, channel_id, role_id))
