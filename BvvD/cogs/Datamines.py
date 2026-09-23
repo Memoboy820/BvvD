@@ -210,7 +210,6 @@ class DataminesCog(commands.Cog):
 
         cursor = conn.cursor()
         cursor.execute("PRAGMA journal_mode = WAL;")
-        cursor.execute("DROP TABLE IF EXISTS datamines_settings;")
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS datamines_settings (
             guild_id INTEGER NOT NULL,
