@@ -218,7 +218,7 @@ class DataminesCog(commands.Cog):
             role_id INTEGER NOT NULL,
             last_datamine_sha TEXT,
             previous_datamine_sha TEXT,
-            PRIMARY KEY (guild_id, channel_id)
+            PRIMARY KEY (guild_id)
             )
         """)
         conn.commit()
