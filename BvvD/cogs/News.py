@@ -231,18 +231,35 @@ class NewsCog(commands.Cog):
         finally:
             conn.close()
 
+        data_rus = None
+        data_eng = None
+
+        try:
+            response_rus = requests.get(RUS_URL, timeout=10)
+            response_rus.raise_for_status()
+            data_rus = response_rus.json()
+        except Exception as e:
+            print(f'[NWS] - {e}')
+        try:
+            response_eng = requests.get(ENG_URL, timeout=10)
+            response_eng.raise_for_status()
+            data_eng = response_eng.json()
+        except Exception as e:
+            print(f'[NWS] - {e}')
+
         for guild_id, channel_id, role_id, last_news_id, sent_news_ids, language in rows:
             try:
                 if language == 'Russian':
-                    MAIN_URL = RUS_URL
+                    if data_rus is None:
+                        continue
+                    data = data_rus
                 elif language == 'English':
-                    MAIN_URL = ENG_URL
+                    if data_eng is None:
+                        continue
+                    data = data_eng
                 else:
                     continue
 
-                response = requests.get(MAIN_URL, timeout=10)
-                response.raise_for_status()
-                data = response.json()
                 if sent_news_ids:
                     sent_ids = json.loads(sent_news_ids)
                 else:
@@ -279,7 +296,6 @@ class NewsCog(commands.Cog):
                         UPDATE news_settings
                         SET last_news_id = ?, sent_news_ids = ?
                         WHERE channel_id = ? AND language = ?
-
                     """, (current_news_id, json.dumps(sent_ids), channel_id, language))
                     conn.commit()
                 finally:
