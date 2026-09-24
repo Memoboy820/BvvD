@@ -7,6 +7,7 @@ import discord
 import requests
 import sqlite3
 import  json
+import asyncio
 
 
 load_dotenv()
@@ -379,7 +380,7 @@ class DataminesCog(commands.Cog):
 
 ## -- запрос на прогон и фильтрацию инфы через ии
 
-            ai_text_list = get_ai_response(prompt, changed_files)
+            ai_text_list = await asyncio.to_thread(get_ai_response, prompt, changed_files)
 
 # -- отправка
             for guild_id, channel_id, role_id, last_datamine_sha in rows:
