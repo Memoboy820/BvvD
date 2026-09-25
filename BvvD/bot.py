@@ -72,7 +72,7 @@ bot.setup_hook = setup_hook
 async def on_ready():
     print(f"Logged in as {bot.user}")
     for guild in bot.guilds:
-    print(f"{guild.name} | id: {guild.id} | members: {guild.member_count}")
+        print(f"{guild.name} | id: {guild.id} | members: {guild.member_count}")
 
 
 bot.run(TOKEN)
