@@ -120,10 +120,12 @@ prompt = """
                     - Preserve exact old and new values whenever they are available.
                     - If an object was added, write: "Added: Object name".
                     - If an object was removed, write: "Removed: Object name".
-                    - If no player-relevant changes are present, return exactly:
-                    No player-relevant datamine changes detected.
 
-                    Always end with exactly this line only in the last text fragment:
+                    If no player-relevant changes are present, return exactly:
+                    
+                    ["No player-relevant datamine changes detected."] without "Datamine information from client files. Not an official announcement" or any other text
+
+                    If there are player-relevant changes - always end with exactly this line only in the last text fragment:
 
                     Datamine information from client files. Not an official announcement.
                     """
