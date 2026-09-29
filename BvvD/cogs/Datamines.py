@@ -143,10 +143,12 @@ GITHUB_HEADERS = {
 models = (
     "gemini-3.5-flash-lite",
     "gemini-3.5-flash",
-    "gemini-3-flash",
-    "gemini-2.5-flash",
-    "gemini-2.5-pro",
-    "gemini-2-flash"
+    "gemini-3.7-flash",
+    "gemini-3.6-flash",
+    "gemini-3.1-flash-lite",
+    "gemini-3-flash-preview",
+    "gemma-4-26b-a4b-it",
+    "gemma-4-31b-it"
 )
 
 
@@ -168,7 +170,7 @@ def get_ai_response(prompt: str, changed_files: str):
             ai_text_list = json.loads(response.text)
             return ai_text_list
         except Exception as e:
-            print(f'{model} - {e}')
+            print(f'{model} - {e[:35]}')
     return None
 
 
@@ -359,7 +361,7 @@ class DataminesCog(commands.Cog):
                 return 
 
             for guild_id, channel_id, role_id, last_datamine_sha in rows:
-
+                
                 if last_datamine_sha is None:  # первый запуск
 
                     conn = sqlite3.connect("/app/data/datamines.db", timeout=10)
@@ -378,6 +380,8 @@ class DataminesCog(commands.Cog):
 ## -- запрос на разницу прошлой и новой версии
 
             compare_data = get_compare_data(last_datamine_sha, sha)
+            if compare_data == None:
+                return
             changed_files = compare_data["files"]
 
 ## -- запрос на прогон и фильтрацию инфы через ии
