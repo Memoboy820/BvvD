@@ -121,7 +121,7 @@ prompt = """
                     - If an object was added, write: "Added: Object name".
                     - If an object was removed, write: "Removed: Object name".
 
-                    If no player-relevant changes are present, return exactly:
+                    If no player-relevant changes are present, or the only change is new version / client version return exactly:
                     
                     ["No player-relevant datamine changes detected."] without "Datamine information from client files. Not an official announcement" or any other text
 
