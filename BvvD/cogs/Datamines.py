@@ -394,7 +394,7 @@ class DataminesCog(commands.Cog):
                 if channel is not None:
                     try:
                         if 'No player-relevant datamine changes detected.' not in ai_text_list:
-                            await channel.send(content=f'<@&{role_id}>')
+                        await channel.send(content=f'<@&{role_id}>')
                             await channel.send(content=f'# {message}:')
                         for text in ai_text_list:
                             await channel.send(content=f"{text[:1950]}")
