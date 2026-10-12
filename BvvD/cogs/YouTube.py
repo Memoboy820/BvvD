@@ -5,11 +5,145 @@ from discord import app_commands
 from discord.ext import commands, tasks
 import requests
 import sqlite3
+import asyncio
 
 load_dotenv()
+### ---------------- constants
 
 YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY")
 
+RUS_UPL_ID = "UUbLGQK0n8cA6oa-W50GTHyQ"
+ENG_UPL_ID = "UUPZsNertSS82YCT2qX9-wHA"
+
+RUS_CHANNEL_ID = "UCbLGQK0n8cA6oa-W50GTHyQ"
+ENG_CHANNEL_ID = "UCPZsNertSS82YCT2qX9-wHA"
+
+url_eng = (
+    f"https://www.googleapis.com/youtube/v3/playlistItems"
+    f"?part=snippet&playlistId={ENG_UPL_ID}&maxResults=1&key={YOUTUBE_API_KEY}"
+)
+url_rus = (
+    f"https://www.googleapis.com/youtube/v3/playlistItems"
+    f"?part=snippet&playlistId={RUS_UPL_ID}&maxResults=1&key={YOUTUBE_API_KEY}"
+)
+
+av_url_eng = (
+    f"https://www.googleapis.com/youtube/v3/channels"
+    f"?part=snippet&id={ENG_CHANNEL_ID}&key={YOUTUBE_API_KEY}"
+)
+av_url_rus = (
+    f"https://www.googleapis.com/youtube/v3/channels"
+    f"?part=snippet&id={RUS_CHANNEL_ID}&key={YOUTUBE_API_KEY}"
+)
+
+### ----------------- functions
+
+def sql_get_all_info(self, timeout: int):
+    conn = sqlite3.connect("/app/data/database.db", timeout=timeout)
+    cursor = conn.cursor()
+    try:
+        cursor.execute(f"SELECT guild_id, channel_id, language, last_video_id, role_id FROM youtube_settings")
+        rows = cursor.fetchall()
+    finally:
+        conn.close()
+    return rows
+
+def fetch_youtube_data(self, avatar_api_url, video_api_url):
+    try:
+        avatar_response = requests.get(avatar_api_url, timeout=10)
+        avatar_response.raise_for_status()
+        avatar_data = avatar_response.json()
+
+        avatar_thumbs = avatar_data["items"][0]["snippet"]["thumbnails"]
+        avatar_url = avatar_thumbs["high"]["url"]
+
+        video_response = requests.get(video_api_url, timeout=10)
+        video_response.raise_for_status()
+        video_data = video_response.json()
+
+        item = video_data["items"][0]
+        thumbs = item["snippet"]["thumbnails"]
+
+        if "maxres" in thumbs:
+            thumb_url = thumbs["maxres"]["url"]
+        elif "standard" in thumbs:
+            thumb_url = thumbs["standard"]["url"]
+        elif "high" in thumbs:
+            thumb_url = thumbs["high"]["url"]
+        elif "medium" in thumbs:
+            thumb_url = thumbs["medium"]["url"]
+        else:
+            thumb_url = thumbs["default"]["url"]
+
+        return item, avatar_url, thumb_url
+
+    except Exception as e:
+        print(f"[YT] - {e}")
+        return None, None, None
+
+def create_final_embed(self, current_video_id, title, live, avatar_url, description, thumb_url, channel_title):
+    embed = discord.Embed(
+        title=title,
+        url=f'https://www.youtube.com/watch?v={current_video_id}',
+        color=0xFFFFFF
+    )
+
+    if live != 'none':
+        embed.add_field(name='📹 LIVE', value="\u200b", inline=False)
+
+    embed.set_thumbnail(url=avatar_url)
+    embed.add_field(
+        name='Description:',
+        value=description[:120] if description else "\u200b",
+        inline=False
+    )
+    embed.set_image(url=thumb_url)
+    embed.set_footer(
+        text=f'📍New video provided by BvvD bot'
+    )
+    embed.set_author(name=channel_title)
+
+    return embed
+
+def update_sql(current_video_id, guild_id, language):
+    conn2 = sqlite3.connect("/app/data/database.db", timeout=10)
+    cursor2 = conn2.cursor()
+
+    try:
+        cursor2.execute("""
+        UPDATE youtube_settings
+        SET last_video_id = ?
+        WHERE guild_id = ? AND language = ?
+        """, (current_video_id, guild_id, language))
+
+        conn2.commit()
+    finally:
+        conn2.close()
+
+
+def language_check(self, language, item_rus, avatar_url_rus, thumb_url_rus, item_eng, avatar_url_eng, thumb_url_eng):
+    if language == 'Russian':
+        if item_rus is None or avatar_url_rus is None or thumb_url_rus is None:
+            return None
+        item = item_rus
+        avatar_url = avatar_url_rus
+        thumb_url = thumb_url_rus
+    elif language == 'English':
+        if item_eng is None or avatar_url_eng is None or thumb_url_eng is None:
+            return None
+        item = item_eng
+        avatar_url = avatar_url_eng
+        thumb_url = thumb_url_eng
+    else:
+        return None
+
+    current_video_id = item["snippet"]["resourceId"]["videoId"]
+    channel_title = item["snippet"]["channelTitle"]
+    title = item["snippet"]["title"]
+    description = item["snippet"]["description"]
+    live = item["snippet"].get("liveBroadcastContent", "none")
+
+    return item, avatar_url, thumb_url, current_video_id, channel_title, title, description, live
 
 async def kd_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError):
     if isinstance(error, app_commands.CommandOnCooldown):
@@ -19,8 +153,9 @@ async def kd_error(self, interaction: discord.Interaction, error: app_commands.A
         )
 
 
-
+### ------------------------------------ Class module
 class YouTubeCog(commands.Cog):
+### ------------------------------------ init
     def __init__(self, bot):
         self.bot = bot
         self.init_db()
@@ -50,6 +185,8 @@ class YouTubeCog(commands.Cog):
             conn.commit()
         finally:
             conn.close()
+### ------------------------------------ commands
+    ### ---- add command
 
     @app_commands.command(name='setyoutubepings', description="Bot will make pings on new WT videos in the channel you've written this command")
     @app_commands.checks.cooldown(1, 10, key=lambda interaction: interaction.guild_id)
@@ -108,6 +245,7 @@ class YouTubeCog(commands.Cog):
             for lang in langs:
                 self.add_item(YouTubeCog.ytButton(lang))
 
+    ### ---- remove command
     
     @app_commands.command(name='removeyoutubepings', description='Bot will stop making pings on new WT videos in the channel command was written in')
     @app_commands.checks.cooldown(1, 10, key=lambda interaction: interaction.guild_id)
@@ -149,169 +287,33 @@ class YouTubeCog(commands.Cog):
         finally:
             conn.close()
 
-
-
+### ---------------- looped search
 
     @tasks.loop(minutes=1)
     async def check_youtube(self):
-        # -- нужное
-        RUS_UPL_ID = "UUbLGQK0n8cA6oa-W50GTHyQ"
-        ENG_UPL_ID = "UUPZsNertSS82YCT2qX9-wHA"
 
-        RUS_CHANNEL_ID = "UCbLGQK0n8cA6oa-W50GTHyQ"
-        ENG_CHANNEL_ID = "UCPZsNertSS82YCT2qX9-wHA"
+        rows = await asyncio.to_thread(sql_get_all_info, self, timeout=10)
+        if not rows:
+            return
 
-        url_eng = (
-            f"https://www.googleapis.com/youtube/v3/playlistItems"
-            f"?part=snippet&playlistId={ENG_UPL_ID}&maxResults=1&key={YOUTUBE_API_KEY}"
-        )
-        url_rus = (
-            f"https://www.googleapis.com/youtube/v3/playlistItems"
-            f"?part=snippet&playlistId={RUS_UPL_ID}&maxResults=1&key={YOUTUBE_API_KEY}"
-        )
+        item_eng, avatar_url_eng, thumb_url_eng = await asyncio.to_thread(fetch_youtube_data, self, av_url_eng, url_eng)
+        item_rus, avatar_url_rus, thumb_url_rus = await asyncio.to_thread(fetch_youtube_data, self, av_url_rus, url_rus)
 
-        av_url_eng = (
-            f"https://www.googleapis.com/youtube/v3/channels"
-            f"?part=snippet&id={ENG_CHANNEL_ID}&key={YOUTUBE_API_KEY}"
-        )
-        av_url_rus = (
-            f"https://www.googleapis.com/youtube/v3/channels"
-            f"?part=snippet&id={RUS_CHANNEL_ID}&key={YOUTUBE_API_KEY}"
-        )
-
-    # -- все запросы
-
-        conn = sqlite3.connect("/app/data/database.db", timeout=10)
-        cursor = conn.cursor()
-
-        try:
-            cursor.execute("SELECT guild_id, channel_id, language, last_video_id, role_id FROM youtube_settings")
-            rows = cursor.fetchall()
-        finally:
-            conn.close()
-
-        item_eng = None
-        item_rus = None
-        avatar_url_eng = None
-        avatar_url_rus = None
-        thumb_url_eng = None
-        thumb_url_rus = None
-        try:
-            response1_eng = requests.get(av_url_eng, timeout=10)
-            response1_eng.raise_for_status()
-            data1_eng = response1_eng.json()
-            avatar_thumbs_eng = data1_eng["items"][0]["snippet"]["thumbnails"]
-            avatar_url_eng = avatar_thumbs_eng["high"]["url"]
-
-            response_eng = requests.get(url_eng, timeout=10)
-            response_eng.raise_for_status()
-            data_eng = response_eng.json()
-            item_eng = data_eng["items"][0]
-            
-            thumbs_eng = item_eng["snippet"]["thumbnails"]
-            if "maxres" in thumbs_eng:
-                thumb_url_eng = thumbs_eng["maxres"]["url"]
-            elif "standard" in thumbs_eng:
-                thumb_url_eng = thumbs_eng["standard"]["url"]
-            elif "high" in thumbs_eng:
-                thumb_url_eng = thumbs_eng["high"]["url"]
-            elif "medium" in thumbs_eng:
-                thumb_url_eng = thumbs_eng["medium"]["url"]
-            else:
-                thumb_url_eng = thumbs_eng["default"]["url"]
-
-            response1_rus = requests.get(av_url_rus, timeout=10)
-            response1_rus.raise_for_status()
-            data1_rus = response1_rus.json()
-            avatar_thumbs_rus = data1_rus["items"][0]["snippet"]["thumbnails"]
-            avatar_url_rus = avatar_thumbs_rus["high"]["url"]
-
-            response_rus = requests.get(url_rus, timeout=10)
-            response_rus.raise_for_status()
-            data_rus = response_rus.json()
-            item_rus = data_rus["items"][0]
-
-            thumbs_rus = item_rus["snippet"]["thumbnails"]
-            if "maxres" in thumbs_rus:
-                thumb_url_rus = thumbs_rus["maxres"]["url"]
-            elif "standard" in thumbs_rus:
-                thumb_url_rus = thumbs_rus["standard"]["url"]
-            elif "high" in thumbs_rus:
-                thumb_url_rus = thumbs_rus["high"]["url"]
-            elif "medium" in thumbs_rus:
-                thumb_url_rus = thumbs_rus["medium"]["url"]
-            else:
-                thumb_url_rus = thumbs_rus["default"]["url"]
-        except Exception as e:
-            print(f'[YT] - {e}')
-
-    # -- рассылка
+    # -- сравнение и рассылка
 
         for guild_id, channel_id, language, last_video_id, role_id in rows:
             try:
-                if language == 'Russian':
-                    if item_rus is None or avatar_url_rus is None or thumb_url_rus is None:
-                        continue
-                    item = item_rus
-                    avatar_url = avatar_url_rus
-                    thumb_url = thumb_url_rus
-                elif language == 'English':
-                    if item_eng is None or avatar_url_eng is None or thumb_url_eng is None:
-                        continue
-                    item = item_eng
-                    avatar_url = avatar_url_eng
-                    thumb_url = thumb_url_eng
-                else:
+                video_data = language_check(self, language=language, item_rus=item_rus, avatar_url_rus=avatar_url_rus, thumb_url_rus=thumb_url_rus, item_eng=item_eng, avatar_url_eng=avatar_url_eng, thumb_url_eng=thumb_url_eng)
+                if video_data is None:
                     continue
-
-                current_video_id = item["snippet"]["resourceId"]["videoId"]
-                channel_title = item["snippet"]["channelTitle"]
-                title = item["snippet"]["title"]
-                description = item["snippet"]["description"]
-                live = item["snippet"].get("liveBroadcastContent", "none")
-                published_at = item["snippet"]["publishedAt"]
-
-    # -- создание ембеда
+                (item, avatar_url, thumb_url, current_video_id, channel_title, title, description, live) = video_data
 
                 if current_video_id != last_video_id:
-                    conn2 = sqlite3.connect("/app/data/database.db", timeout=10)
-                    cursor2 = conn2.cursor()
-
-                    try:
-                        cursor2.execute("""
-                        UPDATE youtube_settings
-                        SET last_video_id = ?
-                        WHERE guild_id = ? AND language = ?
-                        """, (current_video_id, guild_id, language))
-
-                        conn2.commit()
-                    finally:
-                        conn2.close()
-
-                    embed = discord.Embed(
-                        title=title,
-                        url=f'https://www.youtube.com/watch?v={current_video_id}',
-                        color=0xFFFFFF
-                    )
-
-                    if live != 'none':
-                        embed.add_field(name='📹 LIVE', value="\u200b", inline=False)
-
-                    embed.set_thumbnail(url=avatar_url)
-                    embed.add_field(
-                        name='Description:',
-                        value=description[:120] if description else "\u200b",
-                        inline=False
-                    )
-                    embed.set_image(url=thumb_url)
-                    embed.set_footer(
-                        text=f'📍New video provided by BvvD bot'
-                    )
-                    embed.set_author(name=channel_title)
-
+                    embed = create_final_embed(self, channel_title=channel_title, thumb_url=thumb_url, current_video_id=current_video_id, title=title, live=live, avatar_url=avatar_url, description=description)
                     channel = self.bot.get_channel(channel_id)
                     if channel is not None:
                         await channel.send(content=f"<@&{role_id}>", embed=embed)
+                        asyncio.to_thread(update_sql, current_video_id=current_video_id, guild_id=guild_id, language=language)
 
             except Exception as e:
                 import traceback
