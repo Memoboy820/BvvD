@@ -313,7 +313,7 @@ class YouTubeCog(commands.Cog):
                     channel = self.bot.get_channel(channel_id)
                     if channel is not None:
                         await channel.send(content=f"<@&{role_id}>", embed=embed)
-                        asyncio.to_thread(update_sql, current_video_id=current_video_id, guild_id=guild_id, language=language)
+                        await asyncio.to_thread(update_sql, current_video_id=current_video_id, guild_id=guild_id, language=language)
 
             except Exception as e:
                 import traceback
