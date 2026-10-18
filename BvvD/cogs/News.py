@@ -271,11 +271,8 @@ class NewsCog(commands.Cog):
                 await asyncio.to_thread(insert_sql, guild_id=guild_id, channel_id=channel_id, role_id=role_id, language=language, sent_ids=sent_ids)
 
             except Exception as e:
-                print(f'Ошибка в записи: {e}')
-                await interaction.followup.send(
-                    "Не удалось сохранить настройку | Couln't save settings",
-                    ephemeral=True,
-                )
+                print(f'SetNWSPings: {e}')
+                await interaction.followup.send("Не удалось сохранить изменения | Couldn't save the changes", ephemeral=True)
                 return
 
             embed = discord.Embed(color=0xFFFFFF)
@@ -326,11 +323,8 @@ class NewsCog(commands.Cog):
                 )
                 await interaction.followup.send(embed=embed2, ephemeral=True)
         except Exception as e:
-            print(f'RemoveNewsPings: {e}')
-            await interaction.followup.send(
-                "Не удалось удалить настройку | Couldn't delete this setting",
-                ephemeral=True,
-            )
+            print(f'RemoveNWSPings: {e}')
+            await interaction.followup.send("Не удалось сохранить изменения | Couldn't save the changes", ephemeral=True)
             
 
 
