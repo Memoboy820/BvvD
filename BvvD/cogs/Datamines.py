@@ -8,7 +8,7 @@ import requests
 import sqlite3
 import  json
 import asyncio
-
+import httpx
 
 load_dotenv()
 
@@ -170,7 +170,7 @@ def get_ai_response(prompt: str, changed_files: str):
             ai_text_list = json.loads(response.text)
             return ai_text_list
         except Exception as e:
-            print(f'{model} - {e[:35]}')
+            print(f'{model} - {str(e)[:100]}')
     return None
 
 
@@ -196,6 +196,95 @@ def get_compare_data(old_sha: str, new_sha: str) -> dict:       #сравнен�
 
     response.raise_for_status()
     return response.json()
+
+def insert_sql(interaction: discord.Interaction, role_id: int):
+    conn = sqlite3.connect("/app/data/datamines.db", timeout=10)
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            INSERT INTO datamines_settings (guild_id, channel_id, role_id)
+            VALUES (?, ?, ?)
+            ON CONFLICT(guild_id) DO UPDATE SET
+                channel_id = excluded.channel_id,
+                role_id = excluded.role_id
+        """, (interaction.guild.id, interaction.channel.id, role_id))
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def get_channel_ids(interaction: discord.Interaction):
+    conn = sqlite3.connect("/app/data/datamines.db", timeout=10)
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            SELECT channel_id FROM datamines_settings
+            WHERE guild_id = ?;
+        """, (interaction.guild.id,))
+        rows = cursor.fetchall()
+        channel_ids = [row[0] for row in rows]
+        return channel_ids
+    finally:
+        conn.close()
+
+
+
+def delete_sql(interaction: discord.Interaction):
+    conn = sqlite3.connect("/app/data/datamines.db", timeout=10)
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            DELETE FROM datamines_settings
+            WHERE channel_id = ?;
+        """, (interaction.channel.id,))
+        conn.commit()
+    finally:
+        conn.close()
+
+
+
+def get_sql_data():
+    conn = sqlite3.connect("/app/data/datamines.db", timeout=10)
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            SELECT guild_id, channel_id, role_id, last_datamine_sha
+            FROM datamines_settings
+        """)
+        rows = cursor.fetchall()
+        return rows
+    finally:
+        conn.close()
+
+
+def update_sha_sql(sha):
+    conn = sqlite3.connect("/app/data/datamines.db", timeout=10)
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            UPDATE datamines_settings
+            SET last_datamine_sha = ?
+        """, (sha,))
+
+        conn.commit()
+    finally:
+        conn.close()
+
+
+
+def update_sql(sha, guild_id, channel_id):
+    conn = sqlite3.connect("/app/data/datamines.db", timeout=10)
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            UPDATE datamines_settings
+            SET last_datamine_sha = ?
+            WHERE guild_id = ? AND channel_id = ?
+        """, (sha, guild_id, channel_id))
+
+        conn.commit()
+    finally:
+        conn.close()
 
 #--------------------- ПОДГОТОВКА
 
@@ -234,29 +323,20 @@ class DataminesCog(commands.Cog):
     @app_commands.command(name='setdataminespings', description="Sets pings for changes in game's files")
     @app_commands.checks.cooldown(1, 10, key=lambda interaction: interaction.guild_id)
     async def setdataminepings(self, interaction: discord.Interaction, role: discord.Role):
-        role_id = role.id
-        channel_id = interaction.channel.id
-        guild_id = interaction.guild.id
-
-        conn = sqlite3.connect("/app/data/datamines.db", timeout=10)
-        cursor = conn.cursor()
+        await interaction.response.defer(ephemeral=True)
         try:
-            cursor.execute("""
-                INSERT INTO datamines_settings (guild_id, channel_id, role_id)
-                VALUES (?, ?, ?)
-                ON CONFLICT(guild_id) DO UPDATE SET
-                    channel_id = excluded.channel_id,
-                    role_id = excluded.role_id
-            """, (guild_id, channel_id, role_id))
-            conn.commit()
-        finally:
-            conn.close()
+            role_id = role.id
 
-        embed = discord.Embed(color=0xFFFFFF)
-        embed.add_field(
-            name='Done!',
-            value=f"{interaction.channel.mention} is now **set** for WarThunder datamines, and will ping members on changes in game's files with {role.mention} role")
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+            await asyncio.to_thread(insert_sql, interaction=interaction, role_id=role_id)
+
+            embed = discord.Embed(color=0xFFFFFF)
+            embed.add_field(
+                name='Done!',
+                value=f"{interaction.channel.mention} is now **set** for WarThunder datamines, and will ping members on changes in game's files with {role.mention} role")
+            await interaction.followup.send(embed=embed, ephemeral=True)
+        except Exception as e:
+            print(f'SetDTMNSPings: {e}')
+            await interaction.followup.send("Не удалось сохранить изменения | Couldn't save the changes", ephemeral=True)
 
 
 
@@ -265,36 +345,27 @@ class DataminesCog(commands.Cog):
     @app_commands.command(name='removedataminespings', description='Removes datamine pings from this channel')
     @app_commands.checks.cooldown(1, 10, key=lambda interaction: interaction.guild_id)
     async def removedataminespings(self, interaction: discord.Interaction):
-        conn = sqlite3.connect("/app/data/datamines.db", timeout=10)
-        cursor = conn.cursor()
+        await interaction.response.defer(ephemeral=True)
+
         try:
-            cursor.execute("""
-                SELECT channel_id FROM datamines_settings
-                WHERE guild_id = ?;
-            """, (interaction.guild.id,))
-            rows = cursor.fetchall()
-            channel_ids = [row[0] for row in rows]
+            channel_ids = await asyncio.to_thread(get_channel_ids, interaction=interaction)
 
             if interaction.channel.id in channel_ids:
-                cursor.execute("""
-                    DELETE FROM datamines_settings
-                    WHERE channel_id = ?;
-                """, (interaction.channel.id,))
-
+                await asyncio.to_thread(delete_sql, interaction=interaction)
                 embed1 = discord.Embed(
                     title=f'**Removed all** Datamines pings from <#{interaction.channel.id}>',
                     color=0xFFFFFF
                 )
-                await interaction.response.send_message(embed=embed1, ephemeral=True)
+                await interaction.followup.send(embed=embed1, ephemeral=True)
             else:
                 embed2 = discord.Embed(
                     title='This channel is **not** set for any **Datamines** pings',
                     color=0xFFFFFF
                 )
-                await interaction.response.send_message(embed=embed2, ephemeral=True)
-            conn.commit()
-        finally:
-            conn.close()
+                await interaction.followup.send(embed=embed2, ephemeral=True)
+        except Exception as e:
+            print(f'RemoveDTMNS: {e}')
+            await interaction.followup.send("Не удалось сохранить изменения | Couldn't save the changes", ephemeral=True)
 
 
 #----------------------- поиск 
@@ -310,50 +381,33 @@ class DataminesCog(commands.Cog):
                 "gszabi99/War-Thunder-Datamine/commits/master" # big thanks to gszabi
             )
             
-            response = requests.get(
+            response = await asyncio.to_thread(
+                httpx.get,
                 URL,
                 timeout=20,
                 headers={
                     "Accept": "application/vnd.github+json",
                     "X-GitHub-Api-Version": "2026-03-10",
-                }
+                },
+                follow_redirects=True
             )
             response.raise_for_status()
             data = response.json()
 
             sha = data["sha"]
             message = data["commit"]["message"]
-            author = data["commit"]["author"]["name"]
-            date = data["commit"]["author"]["date"] #для будущих обновлений
-            html_url = data["html_url"]
+
 
 
 # -- сверка
-
-            conn = sqlite3.connect("/app/data/datamines.db", timeout=10)
-            cursor = conn.cursor()
-            cursor.execute("""
-                SELECT guild_id, channel_id, role_id, last_datamine_sha
-                FROM datamines_settings
-            """)
-            rows = cursor.fetchall()
-            conn.close()
+            rows = await asyncio.to_thread(get_sql_data)
 
             if not rows:    # на присутствие  
                 return
 
             
             if rows[0][3] is None:                  # на ша
-                conn = sqlite3.connect("/app/data/datamines.db", timeout=10)
-                cursor = conn.cursor()
-
-                cursor.execute("""
-                    UPDATE datamines_settings
-                    SET last_datamine_sha = ?
-                """, (sha,))
-
-                conn.commit()
-                conn.close()
+                await asyncio.to_thread(update_sha_sql, sha=sha)
                 return
 
             
@@ -363,23 +417,12 @@ class DataminesCog(commands.Cog):
             for guild_id, channel_id, role_id, last_datamine_sha in rows:
                 
                 if last_datamine_sha is None:  # первый запуск
-
-                    conn = sqlite3.connect("/app/data/datamines.db", timeout=10)
-                    cursor = conn.cursor()
-
-                    cursor.execute("""
-                        UPDATE datamines_settings
-                        SET last_datamine_sha = ?
-                        WHERE guild_id = ? AND channel_id = ?
-                    """, (sha, guild_id, channel_id))
-
-                    conn.commit()
-                    conn.close()
+                    await asyncio.to_thread(update_sql, sha=sha, guild_id=guild_id, channel_id=channel_id)
                     continue
                 
 ## -- запрос на разницу прошлой и новой версии
 
-            compare_data = get_compare_data(last_datamine_sha, sha)
+            compare_data = await asyncio.to_thread(get_compare_data, last_datamine_sha, sha)
             if compare_data == None:
                 return
             changed_files = compare_data["files"]
@@ -399,20 +442,9 @@ class DataminesCog(commands.Cog):
                         for text in ai_text_list:
                             await channel.send(content=f"{text[:1950]}")
                         await channel.send(content=f"**Data sourced from gszabi99's War Thunder Datamine repository** \n*📍Provided by BvvD bot*")
+                        await asyncio.to_thread(update_sql, sha=sha, guild_id=guild_id, channel_id=channel_id)
                     except Exception as e:
                         print(f'[SEND] - {e}')
-
-# -- запись
-                conn = sqlite3.connect("/app/data/datamines.db", timeout=10)
-                cursor = conn.cursor()
-                cursor.execute("""
-                    UPDATE datamines_settings
-                    SET last_datamine_sha = ?
-                    WHERE guild_id = ? AND channel_id = ?
-""", (sha, guild_id, channel_id))
-                conn.commit()
-                conn.close()
-
 
         except requests.RequestException as e:
             print(f"Ошибка запроса: {e}")
