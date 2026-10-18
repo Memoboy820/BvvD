@@ -2,60 +2,81 @@ import discord
 import sqlite3
 from discord import app_commands
 from discord.ext import commands, tasks
+import asyncio
+
+
+
+def get_rowsyt(guildid):
+    conn = sqlite3.connect("/app/data/database.db", timeout=10)
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            SELECT guild_id, channel_id, role_id, language FROM youtube_settings
+            WHERE guild_id = ?
+""", (guildid,))
+        rowsyt = cursor.fetchall()
+        return rowsyt
+    finally:
+        conn.close()
+
+
+def get_rowsnw(guildid):
+    conn = sqlite3.connect("/app/data/databaseNews.db", timeout=10)
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            SELECT guild_id, channel_id, role_id, language FROM news_settings
+            WHERE guild_id = ?
+""", (guildid,))
+        rowsnw = cursor.fetchall()
+        return rowsnw
+    finally:
+        conn.close()
+
+def get_rowsdtmns(guildid):
+    conn = sqlite3.connect("/app/data/datamines.db", timeout=10)
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            SELECT guild_id, channel_id, role_id FROM datamines_settings
+            WHERE guild_id = ?
+""", (guildid,))
+        rowsdtmns = cursor.fetchall()
+        return rowsdtmns
+    finally:
+        conn.close()
+
+
 
 class CheckerCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-# -------------------------- комманды
+
+
 # -- настройки сервра
 
     @app_commands.command(name='checksettings', description='Shows which channels and roles are used for YouTube and News pings')
     async def checksettings(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
         guildid = interaction.guild.id
+
 
 # -- поиск в бд ютуба
 
-        conn = sqlite3.connect("/app/data/database.db", timeout=10)
-        cursor = conn.cursor()
-        try:
-            cursor.execute("""
-                SELECT guild_id, channel_id, role_id, language FROM youtube_settings
-                WHERE guild_id = ?
-    """, (guildid,))
-            rowsyt = cursor.fetchall()
-        finally:
-            conn.close()
+        rowsyt = await asyncio.to_thread(get_rowsyt, guildid)
 
 # -- поиск в бд новостей
 
-        conn = sqlite3.connect("/app/data/databaseNews.db", timeout=10)
-        cursor = conn.cursor()
-        try:
-            cursor.execute("""
-                SELECT guild_id, channel_id, role_id, language FROM news_settings
-                WHERE guild_id = ?
-    """, (guildid,))
-            rowsnw = cursor.fetchall()
-        finally:
-            conn.close()
+        rowsnw = await asyncio.to_thread(get_rowsnw, guildid)
 
 # -- поиск в бд датамайн
 
-        conn = sqlite3.connect("/app/data/datamines.db", timeout=10)
-        cursor = conn.cursor()
-        try:
-            cursor.execute("""
-                SELECT guild_id, channel_id, role_id FROM datamines_settings
-                WHERE guild_id = ?
-    """, (guildid,))
-            rowsdtmns = cursor.fetchall()
-        finally:
-            conn.close()
+        rowsdtmns = await asyncio.to_thread(get_rowsdtmns, guildid)
 
 # ------------- создание ембеда
 
-        if rowsnw or rowsyt:       
+        if rowsnw or rowsyt or rowsdtmns:       
             embed = discord.Embed(
                 title='Notification Settings / Настройка Пингов',
                 color=0xFFFFFF
@@ -85,7 +106,7 @@ class CheckerCog(commands.Cog):
                 title=':flag_us: This server has no pings \n:flag_ru: На данном сервере не установленны пинги',
                 color=0xFFFFFF
             )
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+        await interaction.followup.send(embed=embed, ephemeral=True)
 
 # -- инфа о боте
 
