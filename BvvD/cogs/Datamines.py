@@ -182,20 +182,21 @@ async def kd_error(self, interaction: discord.Interaction, error: app_commands.A
         )
 
 
-def get_compare_data(old_sha: str, new_sha: str) -> dict:       #сравнение гитов
+async def get_compare_data(old_sha: str, new_sha: str) -> dict:       #сравнение гитов
     url = (
         f"https://api.github.com/repos/{DATAMINE_REPO}/compare/"
         f"{old_sha}...{new_sha}"
     )
-
-    response = requests.get(
-        url,
+    async with httpx.AsyncClient(
+        base_url=url,
         headers=GITHUB_HEADERS,
-        timeout=30
-    )
+        timeout=30,
+        follow_redirects=True
+    ) as client:
 
-    response.raise_for_status()
-    return response.json()
+        response = await client.get("")
+        response.raise_for_status()
+        return response.json()
 
 def insert_sql(interaction: discord.Interaction, role_id: int):
     conn = sqlite3.connect("/app/data/datamines.db", timeout=10)
@@ -422,7 +423,7 @@ class DataminesCog(commands.Cog):
                 
 ## -- запрос на разницу прошлой и новой версии
 
-            compare_data = await asyncio.to_thread(get_compare_data, last_datamine_sha, sha)
+            compare_data = await get_compare_data(last_datamine_sha, sha)
             if compare_data == None:
                 return
             changed_files = compare_data["files"]
@@ -446,7 +447,7 @@ class DataminesCog(commands.Cog):
                     except Exception as e:
                         print(f'[SEND] - {e}')
 
-        except requests.RequestException as e:
+        except httpx.HTTPError as e:
             print(f"Ошибка запроса: {e}")
         except Exception as e:
             print(e)
