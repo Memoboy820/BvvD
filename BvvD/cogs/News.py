@@ -7,8 +7,134 @@ import requests
 import sqlite3
 import re
 import json
+import httpx
+import asyncio
 
 load_dotenv()
+
+# ------------------------------------------ funcs
+
+async def request(client: httpx.AsyncClient, lang_list: int):
+    try:
+        response = await client.get("", params={"appid": 236390, "lang_list": lang_list, "count_before": 0, "count_after": 5})
+        response.raise_for_status()
+        return response.json()
+    except Exception as e:
+        print(f'[NWS] - {e}')
+        return None
+
+
+
+async def get_data_news(): # 8 - rus, 0 - eng
+    async with httpx.AsyncClient(
+        base_url="https://store.steampowered.com/events/ajaxgetadjacentpartnerevents",
+        timeout=10,
+        follow_redirects=True
+    ) as client:
+
+        data = await asyncio.gather(
+            request(client=client, lang_list=8),
+            request(client=client, lang_list=0)
+        )
+
+        return data
+
+
+
+
+def get_sql_data():
+    conn = sqlite3.connect("/app/data/databaseNews.db", timeout=10)
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute("""
+            SELECT guild_id, channel_id, role_id, last_news_id, sent_news_ids, language from news_settings
+        """)
+        rows = cursor.fetchall()
+    finally:
+        conn.close()
+    return rows
+
+
+
+async def get_all_data():
+    data = await asyncio.gather(
+        asyncio.to_thread(get_sql_data),
+        get_data_news()
+    )
+    return data
+
+
+
+def update_sql(current_news_id, channel_id, language, sent_ids):
+    conn = sqlite3.connect("/app/data/databaseNews.db", timeout=10)
+    cursor = conn.cursor()
+
+    try:
+        sent_ids.append(current_news_id)
+        sent_ids = list(dict.fromkeys(sent_ids))[-20:]
+
+        cursor.execute("""
+            UPDATE news_settings
+            SET last_news_id = ?, sent_news_ids = ?
+            WHERE channel_id = ? AND language = ?
+        """, (current_news_id, json.dumps(sent_ids), channel_id, language))
+        conn.commit()
+    finally:
+        conn.close()
+
+
+
+def insert_sql(guild_id, channel_id, role_id, language, sent_ids):
+    conn = sqlite3.connect("/app/data/databaseNews.db", timeout=10)
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            INSERT INTO news_settings (guild_id, channel_id, role_id, language, last_news_id, sent_news_ids)
+            VALUES (?, ?, ?, ?, NULL, ?)
+            ON CONFLICT(guild_id, language) DO UPDATE SET
+                channel_id = excluded.channel_id,
+                role_id = excluded.role_id
+        """, (guild_id, channel_id, role_id, language, json.dumps(sent_ids)))
+        conn.commit()
+    finally:
+        conn.close()
+
+
+
+def get_channel_ids_sql(interaction: discord.Interaction):
+    conn = sqlite3.connect("/app/data/databaseNews.db", timeout=10)
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+                        SELECT channel_id FROM news_settings
+                        WHERE guild_id = ?;
+                """,(interaction.guild.id,))
+        conn.commit()
+        rows = cursor.fetchall()
+        channel_ids = [row[0] for row in rows]
+
+        return channel_ids
+    finally:
+        conn.close()
+
+
+
+def delete_sql(interaction: discord.Interaction):
+    conn = sqlite3.connect("/app/data/databaseNews.db", timeout=10)
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            DELETE FROM news_settings
+            WHERE channel_id = ?;
+        """,(interaction.channel.id,))
+        conn.commit()
+    finally:
+        conn.close()
+
+
+
+
 
 
 async def kd_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError):
@@ -44,6 +170,9 @@ def bbcode_to_discord(text: str) -> str:
 
     return text.strip()
 
+
+# ---------------------------------- Bot Cog
+
 class NewsCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -78,6 +207,10 @@ class NewsCog(commands.Cog):
 
         conn.commit()
         conn.close()
+
+
+# ------------------------------------- Commands
+
 
     @app_commands.command(name='setnewspings', description='Sets channel for WT news')
     @app_commands.checks.cooldown(1, 10, key=lambda interaction: interaction.guild_id)
@@ -118,10 +251,13 @@ class NewsCog(commands.Cog):
             else:
                 return
             
-            conn = sqlite3.connect("/app/data/databaseNews.db", timeout=10)
-            cursor = conn.cursor()
             try:
-                response = requests.get(MAIN_URL, timeout=10)
+                response = await asyncio.to_thread(
+                    httpx.get,
+                    MAIN_URL,
+                    timeout=10,
+                    follow_redirects=True
+                )
                 response.raise_for_status()
                 data = response.json()
 
@@ -130,20 +266,17 @@ class NewsCog(commands.Cog):
                     key=lambda event: event.get("announcement_body", {}).get("posttime", 0),
                     reverse=True
     )
-
                 sent_ids = [str(event["gid"]) for event in events_sorted[1:]]
 
-                cursor.execute("""
-                    INSERT INTO news_settings (guild_id, channel_id, role_id, language, last_news_id, sent_news_ids)
-                    VALUES (?, ?, ?, ?, NULL, ?)
-                    ON CONFLICT(guild_id, language) DO UPDATE SET
-                        channel_id = excluded.channel_id,
-                        role_id = excluded.role_id
-                """, (guild_id, channel_id, role_id, language, json.dumps(sent_ids)))
+                await asyncio.to_thread(insert_sql, guild_id=guild_id, channel_id=channel_id, role_id=role_id, language=language, sent_ids=sent_ids)
 
-                conn.commit()
-            finally:
-                conn.close()
+            except Exception as e:
+                print(f'Ошибка в записи: {e}')
+                await interaction.followup.send(
+                    "Не удалось сохранить настройку | Couln't save settings",
+                    ephemeral=True,
+                )
+                return
 
             embed = discord.Embed(color=0xFFFFFF)
             embed.add_field(name='Done!', value=f'{interaction.channel.mention} is now **set** for **{self.language}** WarThunder News, and will ping members with {self.view.role} role')
@@ -173,79 +306,53 @@ class NewsCog(commands.Cog):
     @app_commands.command(name='removenewspings', description='Removes News pings from this channel')
     @app_commands.checks.cooldown(1, 10, key=lambda interaction: interaction.guild_id)
     async def removenewspings(self, interaction: discord.Interaction):
-        conn = sqlite3.connect("/app/data/databaseNews.db", timeout=10)
-        cursor = conn.cursor()
+        await interaction.response.defer(ephemeral=True)
 
         try:
-            cursor.execute("""
-                SELECT channel_id FROM news_settings
-                WHERE guild_id = ?;
-        """,(interaction.guild.id,))
-            rows = cursor.fetchall()
-            channel_ids = [row[0] for row in rows]
+            channel_ids = await asyncio.to_thread(get_channel_ids_sql, interaction=interaction)
 
             if interaction.channel.id in channel_ids:
-                cursor.execute("""
-                    DELETE FROM news_settings
-                    WHERE channel_id = ?;
-                """,(interaction.channel.id,))
+                await asyncio.to_thread(delete_sql, interaction=interaction)
 
                 embed1 = discord.Embed(
                     title=f'**Removed all** News pings from <#{interaction.channel.id}>',
                     color=0xFFFFFF
                 )
-                await interaction.response.send_message(embed=embed1, ephemeral=True)
+                await interaction.followup.send(embed=embed1, ephemeral=True)
             else:
                 embed2 = discord.Embed(
                     title='This channel is **not** set for any **News** pings',
                     color=0xFFFFFF
                 )
-                await interaction.response.send_message(embed=embed2, ephemeral=True)
-
-            conn.commit()
-        finally:
-            conn.close()
-
-
-
-
-
+                await interaction.followup.send(embed=embed2, ephemeral=True)
+        except Exception as e:
+            print(f'RemoveNewsPings: {e}')
+            await interaction.followup.send(
+                "Не удалось удалить настройку | Couldn't delete this setting",
+                ephemeral=True,
+            )
+            
 
 
+
+
+
+
+# ------------------------------------------ Loop
 
 
     @tasks.loop(minutes=1)
     async def check_news(self):
 
-        RUS_URL = "https://store.steampowered.com/events/ajaxgetadjacentpartnerevents/?appid=236390&lang_list=8&count_before=0&count_after=5"
-        ENG_URL = "https://store.steampowered.com/events/ajaxgetadjacentpartnerevents/?appid=236390&lang_list=0&count_before=0&count_after=5"
-
-        conn = sqlite3.connect("/app/data/databaseNews.db", timeout=10)
-        cursor = conn.cursor()
-
-        try:
-            cursor.execute("""
-                SELECT guild_id, channel_id, role_id, last_news_id, sent_news_ids, language from news_settings
-            """)
-            rows = cursor.fetchall()
-        finally:
-            conn.close()
-
         data_rus = None
         data_eng = None
 
         try:
-            response_rus = requests.get(RUS_URL, timeout=10)
-            response_rus.raise_for_status()
-            data_rus = response_rus.json()
+            rows, data = await get_all_data()
+            data_rus, data_eng = data
         except Exception as e:
-            print(f'[NWS] - {e}')
-        try:
-            response_eng = requests.get(ENG_URL, timeout=10)
-            response_eng.raise_for_status()
-            data_eng = response_eng.json()
-        except Exception as e:
-            print(f'[NWS] - {e}')
+            print(f"[NWS] Получение данных: {e}")
+            return
 
         for guild_id, channel_id, role_id, last_news_id, sent_news_ids, language in rows:
             try:
@@ -285,22 +392,6 @@ class NewsCog(commands.Cog):
                 current_news_id = selected_event["gid"]
                 app_id = selected_event["appid"]
 
-                conn = sqlite3.connect("/app/data/databaseNews.db", timeout=10)
-                cursor = conn.cursor()
-
-                try:
-                    sent_ids.append(current_news_id)
-                    sent_ids = list(dict.fromkeys(sent_ids))[-20:]
-
-                    cursor.execute("""
-                        UPDATE news_settings
-                        SET last_news_id = ?, sent_news_ids = ?
-                        WHERE channel_id = ? AND language = ?
-                    """, (current_news_id, json.dumps(sent_ids), channel_id, language))
-                    conn.commit()
-                finally:
-                    conn.close()
-
                 embed = discord.Embed(
                     title=event_name,
                     url=f"https://steamcommunity.com/games/{app_id}/announcements/detail/{current_news_id}",
@@ -317,6 +408,8 @@ class NewsCog(commands.Cog):
                 channel = self.bot.get_channel(channel_id)
                 if channel is not None:
                     await channel.send(content=f"<@&{role_id}>", embed=embed)
+
+                    await asyncio.to_thread(update_sql, current_news_id=current_news_id, channel_id=channel_id, language=language, sent_ids=sent_ids)
 
             except Exception as e:
                 print(f"[check_news] guild={guild_id} language={language} error={type(e).__name__}: {e}")
