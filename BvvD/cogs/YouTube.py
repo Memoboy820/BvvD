@@ -153,6 +153,62 @@ async def kd_error(self, interaction: discord.Interaction, error: app_commands.A
         )
 
 
+
+def insert_sql(self, interaction: discord.Interaction):
+    conn = sqlite3.connect("/app/data/database.db", timeout=10)
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            INSERT OR REPLACE INTO youtube_settings (guild_id, channel_id, language, last_video_id, role_id)
+            VALUES (?, ?, ?, COALESCE(
+                (SELECT last_video_id FROM youtube_settings 
+                WHERE guild_id = ? AND language = ?
+                ), NULL
+            ), ?)
+        """, (interaction.guild_id, interaction.channel.id, self.data, interaction.guild_id, self.data, self.view.role_id))
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def get_channel_ids_sql(interaction: discord.Interaction):
+    conn = sqlite3.connect("/app/data/database.db", timeout=10)
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute("""
+            SELECT channel_id FROM youtube_settings
+            WHERE guild_id = ?;
+            """,(interaction.guild.id,))
+        rows = cursor.fetchall()
+
+        channel_ids = [row[0] for row in rows]
+        conn.commit()
+        return channel_ids
+    finally:
+        conn.close()
+
+
+
+def delete_sql(interaction: discord.Interaction):
+    conn = sqlite3.connect("/app/data/database.db", timeout=10)
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute("""
+            DELETE FROM youtube_settings
+            WHERE guild_id = ? AND channel_id = ?
+            """,(interaction.guild.id, interaction.channel.id))
+        conn.commit()
+    finally:
+        conn.close()
+
+
+
+
+
+
+
 ### ------------------------------------ Class module
 class YouTubeCog(commands.Cog):
 ### ------------------------------------ init
@@ -206,33 +262,26 @@ class YouTubeCog(commands.Cog):
             self.data = data
 
         async def callback(self, interaction: discord.Interaction):
-            for item in self.view.children:
-                item.disabled = True
-            await interaction.response.edit_message(view=self.view)
-
-
-            embed = discord.Embed(color=0xFFFFFF)
-
-            conn = sqlite3.connect("/app/data/database.db", timeout=10)
-            cursor = conn.cursor()
             try:
-                cursor.execute("""
-                    INSERT OR REPLACE INTO youtube_settings (guild_id, channel_id, language, last_video_id, role_id)
-                    VALUES (?, ?, ?, COALESCE(
-                        (SELECT last_video_id FROM youtube_settings 
-                        WHERE guild_id = ? AND language = ?
-                        ), NULL
-                    ), ?)
-                """, (interaction.guild_id, interaction.channel.id, self.data, interaction.guild_id, self.data, self.view.role_id))
-                conn.commit()
-            finally:
-                conn.close()
+                for item in self.view.children:
+                    item.disabled = True
+                await interaction.response.edit_message(view=self.view)
 
-            embed.add_field(
-                name='Done!',
-                value=f'{interaction.channel.mention} is now **set** for **{self.data}** WarThunder YouTube, and will ping members with {self.view.role} role'
-            )
-            await interaction.followup.send(embed=embed, ephemeral=True)
+
+                embed = discord.Embed(color=0xFFFFFF)
+
+                await asyncio.to_thread(insert_sql, self, interaction=interaction)
+
+                embed.add_field(
+                    name='Done!',
+                    value=f'{interaction.channel.mention} is now **set** for **{self.data}** WarThunder YouTube, and will ping members with {self.view.role} role'
+                )
+                await interaction.followup.send(embed=embed, ephemeral=True)
+            except Exception as e:
+                print(f'SetYTPings: {e}')
+                await interaction.followup.send(
+                    "Не удалось сохранить изменения | Couldn't save the changes", ephemeral=True
+                )
 
     class ytView(discord.ui.View):
         def __init__(self, interaction: discord.Interaction, role: discord.Role):
@@ -250,54 +299,49 @@ class YouTubeCog(commands.Cog):
     @app_commands.command(name='removeyoutubepings', description='Bot will stop making pings on new WT videos in the channel command was written in')
     @app_commands.checks.cooldown(1, 10, key=lambda interaction: interaction.guild_id)
     async def removeyoutubepings(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
+
         guild_id = interaction.guild.id
         channel_id = interaction.channel.id
-        conn = sqlite3.connect("/app/data/database.db", timeout=10)
-        cursor = conn.cursor()
+
 
         try:
-            cursor.execute("""
-                SELECT channel_id FROM youtube_settings
-                WHERE guild_id = ?;
-                """,(guild_id,))
-            rows = cursor.fetchall()
-            channel_ids = [row[0] for row in rows]
+            channel_ids = await asyncio.to_thread(get_channel_ids_sql, interaction=interaction)
 
             if channel_id in channel_ids:
                 embed1 = discord.Embed(
                     title=f'**Removed all** YouTube pings from <#{channel_id}>',
                     color=0xFFFFFF
                 )
-                cursor.execute("""
-                    DELETE FROM youtube_settings
-                    WHERE guild_id = ? AND channel_id = ?
-                    """,(guild_id, channel_id))
-                await interaction.response.send_message(embed=embed1, ephemeral=True)
+                await asyncio.to_thread(delete_sql, interaction=interaction)
+                await interaction.followup.send(embed=embed1, ephemeral=True)
             else:
                 embed1 = discord.Embed(
                     title='This channel is **not** set for any **YouTube** pings',
                     color=0xFFFFFF
                 )
-                await interaction.response.send_message(embed=embed1, ephemeral=True)
+                await interaction.followup.send(embed=embed1, ephemeral=True)
+        except Exception as e:
+            print(f'RemoveYTPings: {e}')
+            await interaction.followup.send("Не удалось сохранить изменения | Couldn't save the changes", ephemeral=True)
 
-
-
-
-            conn.commit()
-        finally:
-            conn.close()
 
 ### ---------------- looped search
 
     @tasks.loop(minutes=1)
     async def check_youtube(self):
+        try:
 
-        rows = await asyncio.to_thread(sql_get_all_info, self, timeout=10)
-        if not rows:
+            rows = await asyncio.to_thread(sql_get_all_info, self, timeout=10)
+            if not rows:
+                return
+
+            item_eng, avatar_url_eng, thumb_url_eng = await asyncio.to_thread(fetch_youtube_data, self, av_url_eng, url_eng)
+            item_rus, avatar_url_rus, thumb_url_rus = await asyncio.to_thread(fetch_youtube_data, self, av_url_rus, url_rus)
+
+        except Exception as e:
+            print(f"[YT] Получение данных: {type(e).__name__}: {e}")
             return
-
-        item_eng, avatar_url_eng, thumb_url_eng = await asyncio.to_thread(fetch_youtube_data, self, av_url_eng, url_eng)
-        item_rus, avatar_url_rus, thumb_url_rus = await asyncio.to_thread(fetch_youtube_data, self, av_url_rus, url_rus)
 
     # -- сравнение и рассылка
 
