@@ -383,7 +383,7 @@ class DataminesCog(commands.Cog):
 #----------------------- поиск 
 
 
-    @tasks.loop(minutes=15)
+    @tasks.loop(minutes=5)
     async def datamines_checker(self):
         try:
 
