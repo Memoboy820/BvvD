@@ -260,7 +260,7 @@ def get_sql_data():
     cursor = conn.cursor()
     try:
         cursor.execute("""
-            SELECT guild_id, channel_id, role_id, last_datamine_sha
+            SELECT guild_id, channel_id, role_id
             FROM datamines_settings
         """)
         rows = cursor.fetchall()
@@ -271,32 +271,31 @@ def get_sql_data():
 
 def update_sha_sql(sha):
     conn = sqlite3.connect("/app/data/datamines.db", timeout=10)
-    cursor = conn.cursor()
     try:
-        cursor.execute("""
-            UPDATE datamines_settings
-            SET last_datamine_sha = ?
+        conn.execute("""
+            INSERT INTO datamines_state (id, last_sha)
+            VALUES (1, ?)
+            ON CONFLICT(id) DO UPDATE SET
+                last_sha = excluded.last_sha
         """, (sha,))
-
         conn.commit()
     finally:
         conn.close()
 
 
-
-def update_sql(sha, guild_id, channel_id):
+def get_sha_sql():
     conn = sqlite3.connect("/app/data/datamines.db", timeout=10)
-    cursor = conn.cursor()
     try:
-        cursor.execute("""
-            UPDATE datamines_settings
-            SET last_datamine_sha = ?
-            WHERE guild_id = ? AND channel_id = ?
-        """, (sha, guild_id, channel_id))
+        row = conn.execute("""
+            SELECT last_sha
+            FROM datamines_state
+            WHERE id = 1
+        """).fetchone()
 
-        conn.commit()
+        return row[0] if row else None
     finally:
         conn.close()
+
 
 #--------------------- ПОДГОТОВКА
 
@@ -316,13 +315,19 @@ class DataminesCog(commands.Cog):
 
         cursor = conn.cursor()
         cursor.execute("PRAGMA journal_mode = WAL;")
+        cursor.execute("""                              
+            CREATE TABLE IF NOT EXISTS datamines_state (
+                id INTEGER PRIMARY KEY CHECK (id = 1),
+                last_sha TEXT NOT NULL
+            )
+        """)
+
+
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS datamines_settings (
             guild_id INTEGER NOT NULL,
             channel_id INTEGER NOT NULL,
             role_id INTEGER NOT NULL,
-            last_datamine_sha TEXT,
-            previous_datamine_sha TEXT,
             PRIMARY KEY (guild_id)
             )
         """)
@@ -383,7 +388,7 @@ class DataminesCog(commands.Cog):
 #----------------------- поиск 
 
 
-    @tasks.loop(minutes=5)
+    @tasks.loop(minutes=15)
     async def datamines_checker(self):
         try:
 
@@ -409,24 +414,21 @@ class DataminesCog(commands.Cog):
             sha = data["sha"]
             message = data["commit"]["message"]
 
-
-
 # -- сверка
+
             rows = await asyncio.to_thread(get_sql_data)
 
-            if not rows:    # на присутствие  
+            if not rows:
                 return
 
-            
-            if rows[0][3] is None:                  # на ша
+            last_datamine_sha = await asyncio.to_thread(get_sha_sql)
+
+            if last_datamine_sha is None:
                 await asyncio.to_thread(update_sha_sql, sha=sha)
                 return
 
-            
-            if rows[0][3] == sha: # на новую версию
-                return 
-
-            last_datamine_sha = rows[0][3]
+            if last_datamine_sha == sha:
+                return
                 
 ## -- запрос на разницу прошлой и новой версии
 
@@ -442,7 +444,7 @@ class DataminesCog(commands.Cog):
                 return
 
 # -- отправка
-            for guild_id, channel_id, role_id, last_datamine_sha in rows:
+            for guild_id, channel_id, role_id in rows:
                 channel = self.bot.get_channel(channel_id)
                 if channel is not None:
                     try:
