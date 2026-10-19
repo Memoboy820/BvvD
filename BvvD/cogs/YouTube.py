@@ -262,10 +262,11 @@ class YouTubeCog(commands.Cog):
             self.data = data
 
         async def callback(self, interaction: discord.Interaction):
+            await interaction.response.defer(ephemeral=True)
             try:
                 for item in self.view.children:
                     item.disabled = True
-                await interaction.response.edit_message(view=self.view)
+                await interaction.edit_original_response(view=self.view)
 
 
                 embed = discord.Embed(color=0xFFFFFF)
@@ -301,7 +302,6 @@ class YouTubeCog(commands.Cog):
     async def removeyoutubepings(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
 
-        guild_id = interaction.guild.id
         channel_id = interaction.channel.id
 
 
