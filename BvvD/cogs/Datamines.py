@@ -445,6 +445,7 @@ class DataminesCog(commands.Cog):
                             await channel.send(content=f"{text[:1950]}")
                         await channel.send(content=f"**Data sourced from gszabi99's War Thunder Datamine repository** \n*📍Provided by BvvD bot*")
                         await asyncio.to_thread(update_sql, sha=sha, guild_id=guild_id, channel_id=channel_id)
+                        print(f"[SHA] github={sha}, database={rows[0][3]}, {channel}")
                     except Exception as e:
                         print(f'[SEND] - {e}')
 
