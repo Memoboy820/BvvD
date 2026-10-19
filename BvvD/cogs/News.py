@@ -231,9 +231,10 @@ class NewsCog(commands.Cog):
             self.language = language
 
         async def callback(self, interaction):
+            await interaction.response.defer(ephemeral=True)
             for item in self.view.children:
                 item.disabled = True
-            await interaction.response.edit_message(view=self.view)
+            await interaction.edit_original_response(view=self.view)
 
 
             guild_id = interaction.guild.id
