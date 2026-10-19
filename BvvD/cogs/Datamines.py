@@ -188,13 +188,12 @@ async def get_compare_data(old_sha: str, new_sha: str) -> dict:       #срав�
         f"{old_sha}...{new_sha}"
     )
     async with httpx.AsyncClient(
-        base_url=url,
         headers=GITHUB_HEADERS,
         timeout=30,
         follow_redirects=True
     ) as client:
 
-        response = await client.get("")
+        response = await client.get(url)
         response.raise_for_status()
         return response.json()
 
@@ -431,6 +430,8 @@ class DataminesCog(commands.Cog):
 ## -- запрос на прогон и фильтрацию инфы через ии
 
             ai_text_list = await asyncio.to_thread(get_ai_response, prompt, changed_files)
+            if ai_text_list is None:
+                return
 
 # -- отправка
             for guild_id, channel_id, role_id, last_datamine_sha in rows:
