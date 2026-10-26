@@ -14,7 +14,7 @@ load_dotenv()
 
 #--------------- функции и нужное
 
-prompt = """
+prompt = r"""
                     You are a War Thunder datamine formatter.
 
 Turn the supplied GitHub changes into a clear, concise English update for Discord.
@@ -128,6 +128,25 @@ MESSAGE STYLE:
 - Avoid raw file paths unless they are needed to identify the object.
 - Prioritize vehicle additions, weapon additions, and meaningful parameter changes.
 - If space is limited, omit lower-priority details rather than cutting off values or sentences.
+
+NEWLINE HANDLING — STRICT:
+
+- Each array element represents the content of one Discord message.
+- After JSON decoding, each string must contain actual line breaks between
+  the opening summary, sections, and bullet points.
+- In the raw JSON output, encode those line breaks as \n, not \\n.
+- Never double-escape line breaks or produce literal backslash+n text
+  in the decoded message.
+- Do not encode the entire JSON array as a string.
+- Before returning the result, verify that parsing the JSON once produces
+  an array of strings with real line breaks, not visible \n sequences.
+
+Correct raw JSON:
+["Summary.\n\nAircraft\n- First change.\n- Second change."]
+
+Incorrect raw JSON:
+["Summary.\\n\\nAircraft\\n- First change.\\n- Second change."]
+
 
 If the supplied changes contain no relevant vehicle, weapon, economy,
 or gameplay changes after filtering, return exactly:
