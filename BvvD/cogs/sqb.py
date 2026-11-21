@@ -52,16 +52,19 @@ class sqbCog(commands.Cog):
         async with httpx.AsyncClient(
         ) as client:
             response = await client.get(f"https://wtapi-production-5ad4c2b0.up.railway.app/sqb_team/{tag}")
+            print(response)
+            print(response.text)
             data = response.json()
+            print(data)
 
 #---------------------------------------
-            if data:
-                for team in data:
-                    num += 1
-                    embed.add_field(name=f"Команда - {num}", value=format_team(team), inline=False)
+            #if data:
+            for team in data:
+                num += 1
+                embed.add_field(name=f"Команда - {num}", value=format_team(team), inline=False)
 
-            else: 
-                embed.description = "Состав не найден"
+            #else: 
+                #embed.description = "Состав не найден"
 
             
 
