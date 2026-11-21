@@ -44,7 +44,10 @@ class sqbCog(commands.Cog):
     @app_commands.command(name="sqb_team", description="[BETA] get info on sqb teams by their tag")
     async def sqb_info(self, interaction: discord.Interaction, tag: str):
         await interaction.response.defer(ephemeral=True)
-        embed = build_embed(tag)
+        embed = discord.Embed(
+            title=f"Комманды полка {tag}",
+            description="Результат может быть старым"
+        )
         num = 1
 
 #------------------------------------
@@ -70,7 +73,7 @@ class sqbCog(commands.Cog):
 
         await interaction.followup.send(embed=embed)
 
-sqbCog.sqb_info.error(kd_error)
+
 
 async def setup(bot):
     await bot.add_cog(sqbCog(bot))
