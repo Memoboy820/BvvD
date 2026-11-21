@@ -4,7 +4,7 @@ from discord.ext import commands, tasks
 from discord import app_commands
 from dotenv import load_dotenv
 import os
-
+print("SQB_MODULE_V2: файл импортирован", flush=True)
 load_dotenv()
 
 api_base_url = os.getenv("BASE_API_URL")
@@ -90,4 +90,6 @@ class sqbCog(commands.Cog):
 
 
 async def setup(bot):
+    print("SQB_MODULE_V2: setup вызван", flush=True)
     await bot.add_cog(sqbCog(bot))
+    print("SQB_MODULE_V2: Cog добавлен", flush=True)
