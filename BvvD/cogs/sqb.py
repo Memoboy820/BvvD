@@ -48,11 +48,27 @@ class sqbCog(commands.Cog):
 
 #------------------------------------
 
-        async with httpx.AsyncClient(
-            base_url=api_base_url
-        ) as client:
-            response = await client.get(api_base_url + f"/sqb_team/{tag}")
-            data = response.json()
+        url = "https://war-thunder-api.onrender.com/sqb_team/nashi"
+
+        logging.warning("API_TEST: начинаю запрос %s", url)
+        
+        try:
+            async with httpx.AsyncClient(
+                timeout=httpx.Timeout(120.0, connect=20.0),
+            ) as client:
+                response = await client.get(url)
+        
+                logging.warning(
+                    "API_TEST: статус=%s, тело=%r",
+                    response.status_code,
+                    response.text[:500],
+                )
+        
+                response.raise_for_status()
+        
+        except Exception:
+            logging.exception("API_TEST: запрос завершился ошибкой")
+            raise
 
 #---------------------------------------
             if data:
