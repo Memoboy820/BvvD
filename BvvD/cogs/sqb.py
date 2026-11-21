@@ -30,6 +30,9 @@ def format_team(team: dict) -> str:
             .strip()
         )
 
+        words = vehicle_name.split()
+        vehicle_name = words[0] if words else "Неизвестно"
+
         lines.append(f"{player:<{width}} → {vehicle_name}")
 
     return "```\n" + "\n".join(lines) + "\n```"
@@ -65,8 +68,8 @@ class sqbCog(commands.Cog):
 #---------------------------------------
             if data:
                 for team in data:
-                    num += 1
                     embed.add_field(name=f"Команда - {num}", value=format_team(team), inline=False)
+                    num += 1
 
             else: 
                 embed.description = "Состав не найден"
