@@ -18,7 +18,7 @@ async def kd_error(self, interaction: discord.Interaction, error: app_commands.A
 
 def get_minutes(team) -> int:
     seconds = team["time"]
-    return seconds / 60
+    return seconds // 60
 
 
 def format_team(team: dict) -> str:
