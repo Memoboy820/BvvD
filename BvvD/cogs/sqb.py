@@ -16,18 +16,24 @@ async def kd_error(self, interaction: discord.Interaction, error: app_commands.A
             ephemeral=True
         )
 
-
-
 def format_team(team: dict) -> str:
     players = team["player_vehicle"]
     width = max((len(player) for player in players), default=0)
 
-    lines = [
-        f"{player:<{width}} → {vehicle}"
-        for player, vehicle in players.items()
-    ]
+    lines = []
+
+    for player, vehicle in players.items():
+        vehicle_name = (
+            vehicle.split("(", 1)[0]
+            .strip()
+            .removeprefix("Из сетапа:")
+            .strip()
+        )
+
+        lines.append(f"{player:<{width}} → {vehicle_name}")
 
     return "```\n" + "\n".join(lines) + "\n```"
+
 
 
 class sqbCog(commands.Cog):
