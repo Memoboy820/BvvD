@@ -42,20 +42,30 @@ class sqbCog(commands.Cog):
 
 
     @app_commands.command(name="sqb_team", description="[BETA] get info on sqb teams by their tag")
-    async def sqb_info(self, tag: str):
+    async def sqb_info(self, interaction: discord.Interaction, tag: str):
         embed = build_embed(tag)
+        num = 1
+
+#------------------------------------
+
         async with httpx.AsyncClient(
             base_url=api_base_url
         ) as client:
             response = await client.get(api_base_url + f"/sqb_team/{tag}")
             data = response.json()
 
-            for team in data:
-                current_team = []
-                team = 1
-                for player, vehicle in team["player_vehicle"].items():
-                    current_team.append((player, vehicle))
-                embed.add_field(name=f"Команда - {team}", value=format_team(data))
+#---------------------------------------
+            if data:
+                for team in data:
+                    num += 1
+                    embed.add_field(name=f"Команда - {num}", value=format_team(team), inline=False)
+
+            else: 
+                embed.description = "Состав не найден"
+
+            
+
+        await interaction.response.send_message(embed=embed)
 
 sqbCog.sqb_info.error(kd_error)
 
