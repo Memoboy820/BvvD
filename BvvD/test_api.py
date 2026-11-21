@@ -15,7 +15,7 @@ logging.getLogger("httpcore").setLevel(logging.DEBUG)
 
 
 async def main() -> None:
-    url = "https://war-thunder-api.onrender.com/sqb_team/nashi"
+    url = "https://wtapi-production-5ad4c2b0.up.railway.app/sqb_team/nashi"
 
     print("API_TEST: файл запущен", flush=True)
     logging.warning("API_TEST: начинаю запрос %s", url)
