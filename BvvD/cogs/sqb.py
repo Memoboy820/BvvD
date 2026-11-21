@@ -50,9 +50,8 @@ class sqbCog(commands.Cog):
 #------------------------------------
 
         async with httpx.AsyncClient(
-            base_url=api_base_url
         ) as client:
-            response = await client.get(api_base_url + f"/sqb_team/{tag}")
+            response = await client.get(f"https://wtapi-production-5ad4c2b0.up.railway.app/sqb_team/{tag}")
             data = response.json()
 
 #---------------------------------------
