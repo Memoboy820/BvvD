@@ -45,20 +45,52 @@ bot = commands.Bot(
 )
 
 async def setup_hook():
-    await bot.load_extension("cogs.YouTube")
-    await bot.load_extension("cogs.News")
-    await bot.load_extension("cogs.Checker")
-    await bot.load_extension("cogs.Datamines")
-    await bot.load_extension("cogs.sqb")
+    import traceback
+
+    print("BOT_MAIN_V3: вход в setup_hook", flush=True)
+
+    extensions = [
+        "cogs.sqb",
+        "cogs.YouTube",
+        "cogs.News",
+        "cogs.Checker",
+        "cogs.Datamines",
+    ]
+
+    for extension in extensions:
+        print(f"ЗАГРУЖАЮ: {extension}", flush=True)
+
+        try:
+            await bot.load_extension(extension)
+        except Exception:
+            print(f"ОШИБКА ЗАГРУЗКИ: {extension}", flush=True)
+            traceback.print_exc()
+            raise
+
+        print(f"ЗАГРУЖЕНО: {extension}", flush=True)
 
     guild = discord.Object(id=GUILD_ID)
 
+    print("Начинаю глобальную синхронизацию", flush=True)
     global_synced = await bot.tree.sync()
-    print("Global:", [cmd.name for cmd in global_synced])
+    print(
+        "Global:",
+        [cmd.name for cmd in global_synced],
+        flush=True,
+    )
 
     bot.tree.copy_global_to(guild=guild)
+
+    print("Начинаю синхронизацию сервера", flush=True)
     guild_synced = await bot.tree.sync(guild=guild)
-    print("Guild:", [cmd.name for cmd in guild_synced])
+    print(
+        "Guild:",
+        [cmd.name for cmd in guild_synced],
+        flush=True,
+    )
+
+
+bot.setup_hook = setup_hook
 
 bot.setup_hook = setup_hook
 
