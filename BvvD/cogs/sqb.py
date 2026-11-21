@@ -41,37 +41,51 @@ class sqbCog(commands.Cog):
         self.bot = bot
 
 
-    @app_commands.command(name="sqb_team", description="[BETA] get info on sqb teams by their tag")
+    @app_commands.command(
+    name="sqb_team",
+    description="[BETA] get info on sqb teams by their tag",
+)
     async def sqb_info(self, interaction: discord.Interaction, tag: str):
-        await interaction.response.defer(ephemeral=True)
-        embed = discord.Embed(
-            title=f"Комманды полка {tag}",
-            description="Результат может быть старым"
-        )
-        num = 1
-
-#------------------------------------
-
-        async with httpx.AsyncClient(
-        ) as client:
-            response = await client.get(f"https://wtapi-production-5ad4c2b0.up.railway.app/sqb_team/{tag}")
-            print(response)
-            print(response.text)
+        print("SQB 1: вход в команду", flush=True)
+    
+        try:
+            await interaction.response.defer(ephemeral=True)
+            print("SQB 2: defer выполнен", flush=True)
+    
+            url = (
+                "https://wtapi-production-5ad4c2b0.up.railway.app"
+                f"/sqb_team/{tag}"
+            )
+            print("SQB 3: начинаю запрос", url, flush=True)
+    
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.get(url)
+    
+            print("SQB 4: статус", response.status_code, flush=True)
+            print("SQB 5: тело", response.text[:1000], flush=True)
+    
+            response.raise_for_status()
             data = response.json()
-            print(data)
-
-#---------------------------------------
-            #if data:
-            for team in data:
-                num += 1
-                embed.add_field(name=f"Команда - {num}", value=format_team(team), inline=False)
-
-            #else: 
-                #embed.description = "Состав не найден"
-
-            
-
-        await interaction.followup.send(embed=embed)
+    
+            embed = build_embed(tag)
+    
+            if data:
+                for num, team in enumerate(data, start=1):
+                    embed.add_field(
+                        name=f"Команда — {num}",
+                        value=format_team(team),
+                        inline=False,
+                    )
+            else:
+                embed.description = "Состав не найден"
+    
+            print("SQB 6: отправляю embed", flush=True)
+            await interaction.followup.send(embed=embed, ephemeral=True)
+            print("SQB 7: ответ отправлен", flush=True)
+    
+        except Exception:
+            import traceback
+            traceback.print_exc()
 
 
 
