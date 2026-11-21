@@ -4,8 +4,6 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 from dotenv import load_dotenv
-import requests
-import json
 
 load_dotenv()
 
@@ -45,58 +43,28 @@ bot = commands.Bot(
 )
 
 async def setup_hook():
-    import traceback
-
-    print("BOT_MAIN_V3: вход в setup_hook", flush=True)
-
-    extensions = [
-        "cogs.sqb",
-        "cogs.YouTube",
-        "cogs.News",
-        "cogs.Checker",
-        "cogs.Datamines",
-    ]
-
-    for extension in extensions:
-        print(f"ЗАГРУЖАЮ: {extension}", flush=True)
-
-        try:
-            await bot.load_extension(extension)
-        except Exception:
-            print(f"ОШИБКА ЗАГРУЗКИ: {extension}", flush=True)
-            traceback.print_exc()
-            raise
-
-        print(f"ЗАГРУЖЕНО: {extension}", flush=True)
+    await bot.load_extension("cogs.YouTube")
+    await bot.load_extension("cogs.News")
+    await bot.load_extension("cogs.Checker")
+    await bot.load_extension("cogs.Datamines")
+    await bot.load_extension("cogs.sqb")
 
     guild = discord.Object(id=GUILD_ID)
 
-    print("Начинаю глобальную синхронизацию", flush=True)
     global_synced = await bot.tree.sync()
-    print(
-        "Global:",
-        [cmd.name for cmd in global_synced],
-        flush=True,
-    )
+    print("Global:", [cmd.name for cmd in global_synced])
 
     bot.tree.copy_global_to(guild=guild)
-
-    print("Начинаю синхронизацию сервера", flush=True)
     guild_synced = await bot.tree.sync(guild=guild)
-    print(
-        "Guild:",
-        [cmd.name for cmd in guild_synced],
-        flush=True,
-    )
-
-
-bot.setup_hook = setup_hook
+    print("Guild:", [cmd.name for cmd in guild_synced])
 
 bot.setup_hook = setup_hook
 
 
 
-
+@bot.event
+async def on_guild_join(guild: discord.Guild):
+    print(f'Зашел на новый сервер: {guild}')
 
 
 
@@ -104,8 +72,5 @@ bot.setup_hook = setup_hook
 @bot.event
 async def on_ready():
     print(f"Logged in as {bot.user}")
-    for guild in bot.guilds:
-        print(f"{guild.name} | id: {guild.id} | members: {guild.member_count}")
-
 
 bot.run(TOKEN)
