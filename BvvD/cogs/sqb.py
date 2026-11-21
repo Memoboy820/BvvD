@@ -16,6 +16,11 @@ async def kd_error(self, interaction: discord.Interaction, error: app_commands.A
             ephemeral=True
         )
 
+def get_minutes(team) -> int:
+    seconds = team["time"]
+    return seconds / 60
+
+
 def format_team(team: dict) -> str:
     players = team["player_vehicle"]
     width = max((len(player) for player in players), default=0)
@@ -68,7 +73,8 @@ class sqbCog(commands.Cog):
 #---------------------------------------
             if data:
                 for team in data:
-                    embed.add_field(name=f"Команда - {num}", value=format_team(team), inline=False)
+                    minutes = get_minutes(team)
+                    embed.add_field(name=f"Команда - {num} | Обновлено {minutes} мин назад", value=format_team(team), inline=False)
                     num += 1
 
             else: 
