@@ -43,32 +43,17 @@ class sqbCog(commands.Cog):
 
     @app_commands.command(name="sqb_team", description="[BETA] get info on sqb teams by their tag")
     async def sqb_info(self, interaction: discord.Interaction, tag: str):
+        await interaction.response.defer(ephemeral=True)
         embed = build_embed(tag)
         num = 1
 
 #------------------------------------
 
-        url = "https://war-thunder-api.onrender.com/sqb_team/nashi"
-
-        logging.warning("API_TEST: начинаю запрос %s", url)
-        
-        try:
-            async with httpx.AsyncClient(
-                timeout=httpx.Timeout(120.0, connect=20.0),
-            ) as client:
-                response = await client.get(url)
-        
-                logging.warning(
-                    "API_TEST: статус=%s, тело=%r",
-                    response.status_code,
-                    response.text[:500],
-                )
-        
-                response.raise_for_status()
-        
-        except Exception:
-            logging.exception("API_TEST: запрос завершился ошибкой")
-            raise
+        async with httpx.AsyncClient(
+            base_url=api_base_url
+        ) as client:
+            response = await client.get(api_base_url + f"/sqb_team/{tag}")
+            data = response.json()
 
 #---------------------------------------
             if data:
@@ -81,7 +66,7 @@ class sqbCog(commands.Cog):
 
             
 
-        await interaction.response.send_message(embed=embed)
+        await interaction.followup.send(embed=embed)
 
 sqbCog.sqb_info.error(kd_error)
 
